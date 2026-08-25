@@ -1,5 +1,4 @@
 import React from 'react';
-import { Container, Row, Col, Nav } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 
 const Layout = ({ user, title, children }) => {
@@ -7,35 +6,50 @@ const Layout = ({ user, title, children }) => {
 
   if (!user) {
     return (
-      <Container className="mt-5 text-center">
-        <h3>Access Denied. Please login.</h3>
-        <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>Go Home</button>
-      </Container>
+      <div className="wm-dashboard-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <div className="wm-card text-center">
+          <h3>Access Denied</h3>
+          <p className="text-muted">Please authenticate to access this workspace.</p>
+          <button className="wm-btn wm-btn-primary mt-3" onClick={() => navigate('/')}>Return to Login</button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Container fluid>
-      <Row style={{ minHeight: '100vh' }}>
-        <Col md={2} className="bg-dark text-white p-4">
-          <div className="d-flex align-items-center mb-4">
-            <div className="bg-secondary me-2" style={{ width: '40px', height: '40px' }}></div>
-            <h5 className="mb-0 text-uppercase">{user.role} DASHBOARD</h5>
-          </div>
-          <Nav className="flex-column gap-2">
-            <Nav.Link className="text-light bg-secondary rounded px-3 py-2">Overview</Nav.Link>
-            <Nav.Link className="text-muted px-3 py-2">Projects</Nav.Link>
-            <Nav.Link className="text-muted px-3 py-2">Payments</Nav.Link>
-            <Nav.Link className="text-danger mt-5 px-3 py-2" onClick={() => navigate('/')}>Logout</Nav.Link>
-          </Nav>
-        </Col>
+    <div className="wm-dashboard-layout">
+      {/* Custom CSS Sidebar */}
+      <aside className="wm-sidebar">
+        <div className="wm-sidebar-logo">Workmint.</div>
         
-        <Col md={10} className="p-5 bg-light">
-          <h3 className="mb-4">{title}</h3>
-          {children}
-        </Col>
-      </Row>
-    </Container>
+        <div className="mb-4 pb-4 border-bottom border-secondary">
+          <small className="text-uppercase" style={{ color: '#64748b', fontSize: '0.75rem' }}>Workspace</small>
+          <div className="fw-bold mt-1 text-white">{user.role}</div>
+        </div>
+
+        <nav className="d-flex flex-column h-100">
+          <div className="wm-nav-item active">Overview</div>
+          <div className="wm-nav-item">Active Projects</div>
+          <div className="wm-nav-item">Financials</div>
+          <div className="wm-nav-item">Settings</div>
+          
+          <div className="wm-nav-item danger" onClick={() => navigate('/')}>Sign Out</div>
+        </nav>
+      </aside>
+      
+      {/* Main Content Area */}
+      <main className="wm-main-content">
+        <header className="d-flex justify-content-between align-items-center mb-5">
+          <h2 className="fw-bold m-0" style={{ color: 'var(--slate-dark)' }}>{title}</h2>
+          <div className="d-flex align-items-center gap-3">
+            <span style={{ color: 'var(--text-muted)' }}>Welcome, {user.name}</span>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--mint-primary)' }}></div>
+          </div>
+        </header>
+        
+        {children}
+      </main>
+    </div>
   );
 };
 
