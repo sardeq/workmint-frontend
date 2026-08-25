@@ -1,16 +1,33 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import '../style/landing.css';
 
 const Landing = ({ onLogin }) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const topServices = ['Application Dev', 'UI/UX Design', 'System Architecture', 'Technical Writing'];
-  const bottomFeatures = ['Escrow Payments', 'Verified Engineering Talent', 'Zero-Friction Revisions'];
+  const topServices = [
+    { title: 'Application Dev', desc: 'Custom software solutions' },
+    { title: 'UI/UX Design', desc: 'Modern interfaces' },
+    { title: 'System Architecture', desc: 'Scalable backends' },
+    { title: 'Technical Writing', desc: 'Clear documentation' }
+  ];
+
+  const categories = [
+    'Web Development', 'Mobile Apps', 'AI/ML', 'DevOps', 'Design', 'Writing'
+  ];
+
+  const bottomFeatures = [
+    { title: 'Escrow Payments', detail: 'Funds are held securely until you approve the final milestones.' },
+    { title: 'Verified Talent', detail: 'Every freelancer is vetted for technical capability and professionalism.' },
+    { title: 'Seamless Revisions', detail: 'Manage feedback and file handoffs directly within your workspace.' }
+  ];
 
   const handleSearch = (e) => {
     e.preventDefault();
-    console.log("Searching for:", searchQuery);
+    if (searchQuery.trim()) {
+      alert(`Routing to search results for: ${searchQuery}`);
+    }
   };
 
   const loginAs = (role) => {
@@ -19,59 +36,55 @@ const Landing = ({ onLogin }) => {
   };
 
   return (
-    <div>
-      {/* Modern Custom Navbar */}
-      <nav className="d-flex justify-content-between align-items-center p-4 bg-white border-bottom">
-        <div className="fw-bold fs-4" style={{ color: 'var(--mint-primary)' }}>Workmint.</div>
-        <div className="d-flex gap-3">
+    <div className="landing-page">
+      <nav className="landing-nav">
+        <div className="brand-logo">Workmint.</div>
+        <div className="nav-actions">
           <button className="wm-btn wm-btn-outline" onClick={() => loginAs('client')}>Client Portal</button>
           <button className="wm-btn wm-btn-dark" onClick={() => loginAs('freelancer')}>Freelancer Login</button>
           <button className="wm-btn wm-btn-primary" onClick={() => loginAs('admin')}>Admin</button>
         </div>
       </nav>
 
-      {/* Hero Section using Custom CSS */}
-      <section className="wm-hero-section">
-        <h1 className="fw-bold mb-4" style={{ fontSize: '3rem', color: 'var(--slate-dark)' }}>
-          Freelancing, <span style={{ color: 'var(--mint-primary)' }}>Refined.</span>
+      <section className="hero-container">
+        <h1 className="hero-title">
+          Freelancing, <span>Refined.</span>
         </h1>
-        <p className="mb-5 text-muted fs-5">Connect with top-tier talent to build your next big idea.</p>
-        
-        <form onSubmit={handleSearch} className="d-flex justify-content-center mx-auto" style={{ maxWidth: '600px', gap: '10px' }}>
-          <input 
-            type="text" 
-            placeholder="Search for 'C++ Developer' or 'React Expert'..." 
-            className="form-control px-4 py-3 shadow-sm border-0 rounded-pill"
+        <p className="hero-subtitle">
+          Connect with top-tier technical and creative talent to build your next big idea securely and efficiently.
+        </p>
+        <form onSubmit={handleSearch} className="search-form">
+          <input
+            type="text"
+            placeholder="Search for 'C++ Developer' or 'React Expert'..."
+            className="search-input"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ fontSize: '1.1rem' }}
           />
-          <button className="wm-btn wm-btn-primary rounded-pill px-4" type="submit">Search</button>
+          <button type="submit" className="search-btn">Find Talent</button>
         </form>
-
-        {/* Semantic Grid instead of Bootstrap Cols */}
-        <div className="wm-grid-4 mx-auto" style={{ maxWidth: '1000px' }}>
-          {topServices.map((service, index) => (
-            <div className="wm-card text-center" key={index} style={{ borderTop: '4px solid var(--mint-primary)' }}>
-              <h5 className="m-0 fw-semibold">{service}</h5>
-            </div>
-          ))}
-        </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-5 mx-auto" style={{ maxWidth: '1000px' }}>
-        <div className="d-flex justify-content-between gap-4 mt-5">
+      {/* Categories */}
+      <section className="services-grid" style={{ marginTop: '1rem', marginBottom: '2rem' }}>
+        {categories.map((cat, idx) => (
+          <div className="service-card" key={idx} style={{ borderTopColor: '#6c63ff', background: '#f1f5f9' }}>
+            <h5>{cat}</h5>
+            <p className="text-muted">Explore {cat} experts</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="features-section">
+        <div className="features-header">
+          <h2>How Workmint Protects You</h2>
+        </div>
+        <div className="features-list">
           {bottomFeatures.map((feature, index) => (
-            <div className="d-flex align-items-start w-100" key={index}>
-              <div className="rounded-circle d-flex align-items-center justify-content-center me-3" 
-                   style={{ width: '48px', height: '48px', backgroundColor: 'var(--mint-light)', color: 'var(--mint-primary)' }}>
-                <span className="fw-bold">{index + 1}</span>
-              </div>
-              <div>
-                <h6 className="fw-bold mb-1">{feature}</h6>
-                <p className="text-muted small">Optimized workflows designed to keep your project moving forward smoothly.</p>
-              </div>
+            <div className="feature-item" key={index}>
+              <div className="feature-icon-wrapper">{index + 1}</div>
+              <h4 style={{ color: '#0f172a', marginBottom: '0.5rem' }}>{feature.title}</h4>
+              <p style={{ color: '#64748b', lineHeight: '1.6' }}>{feature.detail}</p>
             </div>
           ))}
         </div>
