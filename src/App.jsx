@@ -4,9 +4,9 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import './style/index.css';
 
 import Landing from './components/Landing';
-import ClientDashboard from './components/ClientDashboard';
-import FreelancerDashboard from './components/FreelancerDashboard';
-import AdminDashboard from './components/AdminDashboard';
+import ClientDashboard from './pages/client/ClientDashboard';
+import FreelancerDashboard from './pages/Freelancer/FreelancerDashboard';
+import AdminDashboard from './pages/Admin/AdminDashboard';
 
 export const UserContext = createContext();
 
