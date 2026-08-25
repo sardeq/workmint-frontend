@@ -7,6 +7,10 @@ import AdminStats from './components/AdminStats';
 import DisputesList from './components/DisputesList';
 import DisputeModal from './components/DisputeModal';
 
+import AdminOverview from './components/AdminOverview';
+import UserManagement from './components/UserManagement';
+import JobManagement from './components/JobManagement';
+
 const AdminDashboard = () => {
   const { currentUser } = useContext(UserContext); // Hook: Context
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -54,6 +58,15 @@ const AdminDashboard = () => {
                exchangeRate={exchangeRate} 
                onReview={openModal} 
              />
+          </Tab>
+          <Tab eventKey="overview" title="Overview">
+            <AdminOverview />
+          </Tab>
+          <Tab eventKey="users" title="Users">
+            <UserManagement />
+          </Tab>
+          <Tab eventKey="jobs" title="Jobs">
+            <JobManagement />
           </Tab>
         </Tabs>
       </Card>

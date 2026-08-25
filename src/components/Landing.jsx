@@ -75,6 +75,41 @@ const Landing = ({ onLogin }) => {
         ))}
       </section>
 
+      <section className="how-it-works">
+        <h2>How Workmint Works</h2>
+        <div className="steps">
+          <div className="step">
+            <div className="step-icon">1</div>
+            <h5>Post a Project</h5>
+            <p>Describe your needs and set a budget.</p>
+          </div>
+          <div className="step">
+            <div className="step-icon">2</div>
+            <h5>Receive Proposals</h5>
+            <p>Top freelancers bid on your project.</p>
+          </div>
+          <div className="step">
+            <div className="step-icon">3</div>
+            <h5>Work & Pay Securely</h5>
+            <p>Milestone-based payments with escrow.</p>
+          </div>
+        </div>
+      </section>
+
+    <section className="featured-freelancers">
+      <h2>Top Rated Freelancers</h2>
+      <div className="freelancer-grid">
+        {[1,2,3].map(i => (
+          <div className="freelancer-card" key={i}>
+            <img src={`https://i.pravatar.cc/150?img=${i}`} alt="avatar" />
+            <h5>Jane Doe</h5>
+            <p>React Expert</p>
+            <span className="rating">⭐ 4.9</span>
+          </div>
+        ))}
+      </div>
+    </section>
+
       <section className="features-section">
         <div className="features-header">
           <h2>How Workmint Protects You</h2>
