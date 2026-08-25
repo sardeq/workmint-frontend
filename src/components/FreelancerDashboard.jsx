@@ -22,33 +22,21 @@ const FreelancerDashboard = ({ user }) => {
           <Row>
             {orders.map((order) => (
               <Col md={4} key={order.id} className="mb-4">
-                <Card className="h-100 shadow-sm border-0 rounded-4">
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h5 className="mb-0 text-truncate">{order.project}</h5>
-                      <Badge bg={
-                        order.status === 'Completed' ? 'success' : 
-                        order.status === 'In Progress' ? 'primary' : 'warning'
-                      }>
-                        {order.status}
-                      </Badge>
-                    </div>
-                    <Card.Subtitle className="mb-2 text-muted">Client: {order.client}</Card.Subtitle>
-                    <h3 className="text-success">{order.price}</h3>
-                    <hr />
-                    {order.status === 'Pending Review' && (
-                      <div className="d-flex gap-2">
-                        <Button variant="success" size="sm" onClick={() => updateOrderStatus(order.id, 'In Progress')}>Accept</Button>
-                        <Button variant="outline-danger" size="sm">Decline</Button>
-                      </div>
-                    )}
-                    {order.status === 'In Progress' && (
-                      <Button variant="primary" size="sm" className="w-100" onClick={() => updateOrderStatus(order.id, 'Completed')}>
-                        Submit for Payment
-                      </Button>
-                    )}
-                  </Card.Body>
-                </Card>
+                <div className="wm-card h-100">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5 className="mb-0 text-truncate fw-bold">{order.project}</h5>
+                    <span className="badge bg-light text-dark border">{order.status}</span>
+                  </div>
+                  <div className="text-muted small mb-3">Client: {order.client}</div>
+                  <h3 style={{ color: 'var(--mint-primary)' }}>{order.price}</h3>
+                  <hr style={{ borderColor: 'var(--border-color)' }} />
+                  
+                  {order.status === 'In Progress' && (
+                    <button className="wm-btn wm-btn-primary w-100" onClick={() => updateOrderStatus(order.id, 'Completed')}>
+                      Submit for Payment
+                    </button>
+                  )}
+                </div>
               </Col>
             ))}
           </Row>
