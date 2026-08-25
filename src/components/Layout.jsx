@@ -2,16 +2,17 @@ import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserContext } from '../App';
 
-const Layout = ({ title, children }) => {
+// Add activeTab and setActiveTab to props
+const Layout = ({ title, activeTab, setActiveTab, children }) => {
   const navigate = useNavigate();
-  const { currentUser, setCurrentUser } = useContext(UserContext);
+  const { currentUser, setCurrentUser } = useContext(UserContext); //[cite: 2]
 
-  const handleSignOut = () => {
+  const handleSignOut = () => { //[cite: 2]
     setCurrentUser(null);
     navigate('/');
   };
 
-  if (!currentUser) {
+  if (!currentUser) { //[cite: 2]
     return (
       <div className="wm-dashboard-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
         <div className="wm-card text-center">
@@ -23,20 +24,19 @@ const Layout = ({ title, children }) => {
     );
   }
 
-  // Sidebar items based on role
-  const getNavItems = () => {
+  const getNavItems = () => { //[cite: 2]
     const base = ['Overview', 'Projects', 'Financials', 'Settings'];
     if (currentUser.role === 'client') {
-      return ['Overview', 'My Projects', 'Find Freelancers', 'Post Job', 'Messages'];
+      return ['Overview', 'My Projects', 'Find Freelancers', 'Post Job', 'Messages']; //[cite: 2]
     } else if (currentUser.role === 'freelancer') {
-      return ['Overview', 'My Orders', 'Available Jobs', 'My Proposals', 'Portfolio', 'Messages'];
+      return ['Overview', 'My Orders', 'Available Jobs', 'My Proposals', 'Portfolio', 'Messages']; //[cite: 2]
     } else if (currentUser.role === 'admin') {
-      return ['Overview', 'Disputes', 'Freelancer Approvals', 'User Management', 'Analytics'];
+      return ['Overview', 'Disputes', 'Freelancer Approvals', 'User Management', 'Analytics']; //[cite: 2]
     }
     return base;
   };
 
-  const navItems = getNavItems();
+  const navItems = getNavItems(); //[cite: 2]
 
   return (
     <div className="wm-dashboard-layout">
@@ -49,7 +49,14 @@ const Layout = ({ title, children }) => {
 
         <nav className="d-flex flex-column h-100">
           {navItems.map((item, idx) => (
-            <div className="wm-nav-item" key={idx}>{item}</div>
+            <div 
+              // Apply active class dynamically and attach click handler[cite: 2, 7]
+              className={`wm-nav-item ${activeTab === item ? 'active' : ''}`} 
+              key={idx}
+              onClick={() => setActiveTab && setActiveTab(item)}
+            >
+              {item}
+            </div>
           ))}
           <div className="wm-nav-item text-danger" onClick={handleSignOut}>Sign Out</div>
         </nav>
