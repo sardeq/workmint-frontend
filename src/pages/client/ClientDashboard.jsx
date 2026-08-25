@@ -6,6 +6,9 @@ import { UserContext } from '../../App';
 
 import ProjectCard from './components/ProjectCard';
 import PostJobForm from './components/PostJobForm';
+import ClientOverview from './components/ClientOverview';
+import FindFreelancers from './components/FindFreelancers';
+
 
 const ClientDashboard = () => {
   const { currentUser } = useContext(UserContext); // Hook: Context
@@ -96,7 +99,14 @@ const ClientDashboard = () => {
              {/* Componentizing the form logic */}
              <PostJobForm onPostJob={handlePostJob} />
           </Tab>
-          
+
+          <Tab eventKey="overview" title="Overview">
+            <ClientOverview projects={activeProjects} />
+          </Tab>
+          <Tab eventKey="find" title="Find Freelancers">
+            <FindFreelancers />
+          </Tab>
+                    
         </Tabs>
       </Card>
     </Layout>

@@ -4,6 +4,10 @@ import Layout from '../../components/Layout';
 import { UserContext } from '../../App';
 import OrdersTable from './components/OrdersTable';
 import AvailableJobs from './components/AvailableJobs';
+import FreelancerOverview from './components/FreelancerOverview';
+import MyProposals from './components/MyProposals';
+import Portfolio from './components/Portfolio';
+import ProfileEdit from './components/ProfileEdit';
 
 const FreelancerDashboard = () => {
   const { currentUser } = useContext(UserContext);
@@ -48,6 +52,19 @@ const FreelancerDashboard = () => {
 
           <Tab eventKey="jobs" title="Available Jobs">
             <AvailableJobs jobs={availableJobs} onApply={applyToJob} />
+          </Tab>
+
+          <Tab eventKey="overview" title="Overview">
+            <FreelancerOverview orders={orders} proposals={proposals} />
+          </Tab>
+          <Tab eventKey="proposals" title="My Proposals">
+            <MyProposals proposals={proposals} />
+          </Tab>
+          <Tab eventKey="portfolio" title="Portfolio">
+            <Portfolio />
+          </Tab>
+          <Tab eventKey="profile" title="Profile">
+            <ProfileEdit />
           </Tab>
 
         </Tabs>
