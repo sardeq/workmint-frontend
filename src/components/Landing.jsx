@@ -1,27 +1,15 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import Navbar from './Navbar';
+import Hero from './Hero';
+import Mission from './Mission';           // NEW
+import ValueProp from './ValueProp';       // NEW
+import EscrowCalculator from './EscrowCalculator';
+import FreelancerGrid from './FreelancerGrid';
+import Footer from './Footer';             // NEW
 import '../style/landing.css';
 
 const Landing = ({ onLogin }) => {
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-
-  const topServices = [
-    { title: 'Application Dev', desc: 'Custom software solutions' },
-    { title: 'UI/UX Design', desc: 'Modern interfaces' },
-    { title: 'System Architecture', desc: 'Scalable backends' },
-    { title: 'Technical Writing', desc: 'Clear documentation' }
-  ];
-
-  const categories = [
-    'Web Development', 'Mobile Apps', 'AI/ML', 'DevOps', 'Design', 'Writing'
-  ];
-
-  const bottomFeatures = [
-    { title: 'Escrow Payments', detail: 'Funds are held securely until you approve the final milestones.' },
-    { title: 'Verified Talent', detail: 'Every freelancer is vetted for technical capability and professionalism.' },
-    { title: 'Seamless Revisions', detail: 'Manage feedback and file handoffs directly within your workspace.' }
-  ];
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -30,100 +18,30 @@ const Landing = ({ onLogin }) => {
     }
   };
 
-  const loginAs = (role) => {
-    onLogin(role);
-    navigate(`/${role}`);
-  };
-
   return (
     <div className="landing-page">
-      <nav className="landing-nav">
-        <div className="brand-logo">Workmint.</div>
-        <div className="nav-actions">
-          <button className="wm-btn wm-btn-outline" onClick={() => loginAs('client')}>Client Portal</button>
-          <button className="wm-btn wm-btn-dark" onClick={() => loginAs('freelancer')}>Freelancer Login</button>
-          <button className="wm-btn wm-btn-primary" onClick={() => loginAs('admin')}>Admin</button>
-        </div>
-      </nav>
+      <Navbar onLogin={onLogin} />
+      
+      <Hero 
+        searchQuery={searchQuery} 
+        setSearchQuery={setSearchQuery} 
+        handleSearch={handleSearch} 
+      />
 
-      <section className="hero-container">
-        <h1 className="hero-title">
-          Freelancing, <span>Refined.</span>
-        </h1>
-        <p className="hero-subtitle">
-          Connect with top-tier technical and creative talent to build your next big idea securely and efficiently.
-        </p>
-        <form onSubmit={handleSearch} className="search-form">
-          <input
-            type="text"
-            placeholder="Search for 'C++ Developer' or 'React Expert'..."
-            className="search-input"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <button type="submit" className="search-btn">Find Talent</button>
-        </form>
+      <Mission />
+      <ValueProp />
+
+      <section className="calculator-section">
+        <div className="features-header text-center">
+          <h2>Transparent Escrow Payments</h2>
+          <p className="text-muted">Estimate your project costs in your local currency with real-time rates.</p>
+        </div>
+        <EscrowCalculator />
       </section>
 
-      {/* Categories */}
-      <section className="services-grid" style={{ marginTop: '1rem', marginBottom: '2rem' }}>
-        {categories.map((cat, idx) => (
-          <div className="service-card" key={idx} style={{ borderTopColor: '#6c63ff', background: '#f1f5f9' }}>
-            <h5>{cat}</h5>
-            <p className="text-muted">Explore {cat} experts</p>
-          </div>
-        ))}
-      </section>
+      <FreelancerGrid />
 
-      <section className="how-it-works">
-        <h2>How Workmint Works</h2>
-        <div className="steps">
-          <div className="step">
-            <div className="step-icon">1</div>
-            <h5>Post a Project</h5>
-            <p>Describe your needs and set a budget.</p>
-          </div>
-          <div className="step">
-            <div className="step-icon">2</div>
-            <h5>Receive Proposals</h5>
-            <p>Top freelancers bid on your project.</p>
-          </div>
-          <div className="step">
-            <div className="step-icon">3</div>
-            <h5>Work & Pay Securely</h5>
-            <p>Milestone-based payments with escrow.</p>
-          </div>
-        </div>
-      </section>
-
-    <section className="featured-freelancers">
-      <h2>Top Rated Freelancers</h2>
-      <div className="freelancer-grid">
-        {[1,2,3].map(i => (
-          <div className="freelancer-card" key={i}>
-            <img src={`https://i.pravatar.cc/150?img=${i}`} alt="avatar" />
-            <h5>Jane Doe</h5>
-            <p>React Expert</p>
-            <span className="rating">⭐ 4.9</span>
-          </div>
-        ))}
-      </div>
-    </section>
-
-      <section className="features-section">
-        <div className="features-header">
-          <h2>How Workmint Protects You</h2>
-        </div>
-        <div className="features-list">
-          {bottomFeatures.map((feature, index) => (
-            <div className="feature-item" key={index}>
-              <div className="feature-icon-wrapper">{index + 1}</div>
-              <h4 style={{ color: '#0f172a', marginBottom: '0.5rem' }}>{feature.title}</h4>
-              <p style={{ color: '#64748b', lineHeight: '1.6' }}>{feature.detail}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <Footer />
     </div>
   );
 };
