@@ -11,9 +11,11 @@ const NAV = {
   client: [
     { key: 'Overview', icon: 'grid' },
     { key: 'My Projects', icon: 'briefcase' },
-    { key: 'Find Freelancers', icon: 'search' },
+    { key: 'Proposals', icon: 'inbox' },
     { key: 'Post a Job', icon: 'plus' },
+    { key: 'Find Freelancers', icon: 'search' },
     { key: 'Messages', icon: 'chat' },
+    { key: 'Payments', icon: 'wallet' },
   ],
   freelancer: [
     { key: 'Overview', icon: 'grid' },
@@ -143,7 +145,7 @@ const Layout = ({
                 <div style={{ maxHeight: 300, overflowY: 'auto' }}>
                   {notifications.length === 0 && (
                     <div className="px-3 py-4 text-center text-muted" style={{ fontSize: '0.85rem' }}>
-                      Nothing yet. Client activity shows up here.
+                      Nothing yet. Activity on your contracts shows up here.
                     </div>
                   )}
                   {notifications.slice(0, 8).map((n) => (

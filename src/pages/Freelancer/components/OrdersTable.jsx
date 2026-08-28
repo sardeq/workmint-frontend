@@ -4,7 +4,7 @@ import Icon from '../../../components/Icon';
 import { Pill, Avatar, EmptyState, EscrowBar } from '../../../components/Shared';
 import {
   money, shortDate, deadlineLabel, deadlineTone,
-  orderStatus, orderTotal, orderReleased, orderProgress, unreadCount, needsAttention,
+  orderStatus, orderTotal, orderReleased, orderProgress, unreadCount, needsAttention, byUrgency,
 } from '../../../data/freelancerData';
 
 const FILTERS = [
@@ -32,7 +32,7 @@ const OrdersTable = ({ orders, onOpen }) => {
       const q = search.toLowerCase();
       return o.project.toLowerCase().includes(q) || o.client.toLowerCase().includes(q) || o.id.toLowerCase().includes(q);
     })
-    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+    .sort(byUrgency('freelancer'));
 
   return (
     <div className="wm-panel wm-panel--flush">
