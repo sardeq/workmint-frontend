@@ -1,18 +1,33 @@
 import React from 'react';
 
-const Mission = () => {
-  return (
-    <section className="marketing-sections">
-      <div className="mission-box">
-        <h2>Our Mission</h2>
+/* This used to be a prose block in the middle of the page. It works better as
+   the close: state the position, then give the reader the two doors out. */
+const Mission = ({ onEnter }) => (
+  <section className="closing" id="mission">
+    <div className="wm-container closing__grid">
+      <div>
+        <h2>
+          Building software should not come with a <em>collections problem.</em>
+        </h2>
         <p>
-          At Workmint, we believe that building exceptional software and designs shouldn't be a logistical nightmare. 
-          Our mission is to bridge the gap between visionary clients and elite technical talent—from specialized application developers to visionary UI/UX designers. 
-          We manage the friction of contracts, milestone approvals, and escrow payments, so you can focus purely on creating and collaborating.
+          Workmint exists because the hard part of freelancing is rarely the work. It is the
+          unpaid invoice, the sixth free revision, the brief that grew by half. We put the
+          money in escrow, put every approval on the record, and give both sides one place to
+          watch the project move. What is left is the part you actually signed up for.
         </p>
       </div>
-    </section>
-  );
-};
+
+      <div className="closing__actions">
+        <button type="button" className="wm-btn wm-btn-primary wm-btn--lg" onClick={() => onEnter('freelancer')}>
+          Start earning as a freelancer
+        </button>
+        <button type="button" className="wm-btn wm-btn-dark wm-btn--lg" style={{ border: '1px solid #334155' }} onClick={() => onEnter('client')}>
+          Hire technical talent
+        </button>
+        <p className="closing__note">No card needed to look around.</p>
+      </div>
+    </div>
+  </section>
+);
 
 export default Mission;

@@ -1,40 +1,65 @@
 import React from 'react';
 
-const Footer = () => {
-  return (
-    <footer className="wm-footer">
+const COLUMNS = [
+  {
+    heading: 'Platform',
+    links: [
+      { href: '#how-it-works', label: 'How it works' },
+      { href: '#pricing', label: 'Pricing and fees' },
+      { href: '#escrow', label: 'Escrow security' },
+      { href: '#talent', label: 'Browse talent' },
+    ],
+  },
+  {
+    heading: 'Company',
+    links: [
+      { href: '#mission', label: 'Our mission' },
+      { href: '#why', label: 'Why Workmint' },
+      { href: '#support', label: 'Help and support' },
+      { href: '#terms', label: 'Terms of service' },
+    ],
+  },
+  {
+    heading: 'Talent',
+    links: [
+      { href: '#talent', label: 'Developers' },
+      { href: '#talent', label: 'Designers' },
+      { href: '#talent', label: 'Data engineers' },
+      { href: '#talent', label: 'Systems engineers' },
+    ],
+  },
+];
+
+const Footer = () => (
+  <footer className="wm-footer">
+    <div className="wm-container">
       <div className="footer-grid">
         <div className="footer-brand">
           <h3>Workmint.</h3>
-          <p>Elevating the freelance experience for technical professionals and visionary clients worldwide.</p>
+          <p>
+            Milestone escrow for technical freelance work. Funded up front, released on approval,
+            recorded end to end.
+          </p>
         </div>
-        
-        <div className="footer-links">
-          <h4>Platform</h4>
-          <ul>
-            <li><a href="#how-it-works">How it Works</a></li>
-            <li><a href="#escrow">Escrow Security</a></li>
-            <li><a href="#talent">Browse Talent</a></li>
-            <li><a href="#pricing">Pricing & Fees</a></li>
-          </ul>
-        </div>
-        
-        <div className="footer-links">
-          <h4>Company</h4>
-          <ul>
-            <li><a href="#about">About Us</a></li>
-            <li><a href="#mission">Our Mission</a></li>
-            <li><a href="#support">Help & Support</a></li>
-            <li><a href="#terms">Terms of Service</a></li>
-          </ul>
-        </div>
+
+        {COLUMNS.map((column) => (
+          <div className="footer-links" key={column.heading}>
+            <h4>{column.heading}</h4>
+            <ul>
+              {column.links.map((link) => (
+                <li key={link.label}><a href={link.href}>{link.label}</a></li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
-      
+
       <div className="footer-bottom">
         <p>&copy; {new Date().getFullYear()} Workmint. All rights reserved.</p>
+        <p>Built in Amman, Jordan.</p>
       </div>
-    </footer>
-  );
-};
+    </div>
+  </footer>
+);
 
 export default Footer;
