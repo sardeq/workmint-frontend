@@ -9,14 +9,13 @@ import {
 
 const DOT_ICON = { approved: 'check', active: 'clock', submitted: 'upload', revision: 'revision', pending: 'lock' };
 
-const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onSend, onRead, onClientAction }) => {
+const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onSend, onRead }) => {
   const [tab, setTab] = useState('milestones');
   const [drafts, setDrafts] = useState({});
   const [message, setMessage] = useState('');
   const [showScope, setShowScope] = useState(false);
   const [scopeForm, setScopeForm] = useState({ reason: '', extraCost: '', extraDays: '' });
   const [scopeError, setScopeError] = useState('');
-  const [reviewNotes, setReviewNotes] = useState({});
 
   const chatEndRef = useRef(null);
   const unread = unreadCount(order);
@@ -24,7 +23,7 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
 
   // Opening the thread clears its unread count.
   useEffect(() => {
-    if (tab === 'messages') onRead(order.id);
+    if (tab === 'messages') onRead(order.id, 'freelancer');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, order.id]);
 
@@ -67,7 +66,7 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
   const handleSend = (e) => {
     e.preventDefault();
     if (!message.trim()) return;
-    onSend(order.id, message.trim());
+    onSend(order.id, 'freelancer', message.trim());
     setMessage('');
   };
 
@@ -189,29 +188,12 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
           )}
 
           {milestone.status === 'submitted' && (
-            <div className="wm-demo-box">
-              <div className="wm-demo-box__label">Demo only - the client dashboard will do this</div>
-              <div className="d-flex flex-wrap align-items-center gap-2 mt-2">
-                <Button size="sm" variant="outline-primary" onClick={() => onClientAction(order.id, milestone.id, 'approve')}>
-                  Client approves
-                </Button>
-                <Form.Control
-                  size="sm"
-                  style={{ maxWidth: 260 }}
-                  placeholder="Revision note"
-                  value={reviewNotes[milestone.id] || ''}
-                  onChange={(e) => setReviewNotes({ ...reviewNotes, [milestone.id]: e.target.value })}
-                />
-                <Button
-                  size="sm"
-                  variant="outline-secondary"
-                  onClick={() => onClientAction(order.id, milestone.id, 'revision', reviewNotes[milestone.id])}
-                >
-                  Client requests revision
-                </Button>
-              </div>
+            <div className="wm-note wm-note--muted">
+              <strong>With {order.client}</strong>
+              They approve to release {money(milestone.amount)}, or send it back with notes.
             </div>
           )}
+
         </div>
       </div>
     );
@@ -301,9 +283,9 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
           ) : (
             <div className="wm-chat">
               {order.messages.map((m) => (
-                <div key={m.id} className={`wm-bubble wm-bubble--${m.from}`}>
+                <div key={m.id} className={`wm-bubble wm-bubble--${m.from === 'freelancer' ? 'you' : 'client'}`}>
                   {m.text}
-                  <div className="wm-bubble__meta">{m.from === 'you' ? 'You' : order.client} &middot; {timeAgo(m.at)}</div>
+                  <div className="wm-bubble__meta">{m.from === 'freelancer' ? 'You' : order.client} &middot; {timeAgo(m.at)}</div>
                 </div>
               ))}
               <div ref={chatEndRef} />

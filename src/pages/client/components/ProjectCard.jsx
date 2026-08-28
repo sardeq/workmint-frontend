@@ -1,66 +1,76 @@
 import React from 'react';
-import { Col, Card, Badge, ProgressBar, Button } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
+import Icon from '../../../components/Icon';
+import { Pill, Avatar, EscrowBar } from '../../../components/Shared';
+import {
+  money, shortDate, deadlineLabel, deadlineTone,
+  orderStatus, orderTotal, orderReleased, orderEscrow, orderProgress, unreadCount, clientNextAction,
+} from '../../../data/freelancerData';
 
-// Functional Component receiving Props
-const ProjectCard = ({ project, rates, currency, onApprove }) => {
-  
-  // Logic: Currency Conversion
-  const convertedCost = rates[currency] 
-    ? (project.costUSD * rates[currency]).toFixed(2) 
-    : project.costUSD;
+/* One card per contract. Everything on it answers "where is my money and
+   what happens next", which is the only question a client card needs to. */
+const ProjectCard = ({ project, onOpen }) => {
+  const status = orderStatus(project, 'client');
+  const action = clientNextAction(project);
+  const unread = unreadCount(project, 'client');
+  const done = status.key === 'completed';
 
   return (
-    <Col md={6} lg={4} className="mb-3">
-      <Card className="h-100 border-0 shadow-sm rounded-4">
-        <Card.Body>
-          <div className="d-flex justify-content-between mb-2">
-            <h6 className="fw-bold">{project.title}</h6>
-            <Badge bg={project.progress === 100 ? 'success' : 'primary'}>
-              {project.status}
-            </Badge>
+    <div className="wm-panel h-100 d-flex flex-column">
+      <div className="d-flex justify-content-between align-items-start gap-2 mb-3">
+        <div style={{ minWidth: 0 }}>
+          <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)', marginBottom: '0.35rem' }}>{project.project}</h6>
+          <div className="d-flex align-items-center gap-2">
+            <Avatar name={project.freelancer.name} size={26} />
+            <span className="text-muted" style={{ fontSize: '0.82rem' }}>{project.freelancer.name}</span>
           </div>
-          <p className="text-muted small mb-1">Freelancer: {project.freelancer}</p>
-          <p className="fw-bold text-success small mb-3">
-            Cost: {currency} {convertedCost}
-          </p>
-          
-          <ProgressBar 
-            now={project.progress} 
-            variant="success" 
-            style={{ height: '8px' }} 
-            className="mb-3" 
-          />
-          
-          {/* Logic: Conditional Rendering based on status */}
-          {project.status === 'In Revision' && (
-            <div className="bg-light p-3 rounded text-center mb-3 border">
-              <small className="text-muted d-block mb-2 fw-bold">Action Required</small>
-              <Button 
-                variant="success" 
-                size="sm" 
-                className="me-2" 
-                onClick={() => onApprove(project.id, 2)}
-              >
-                Approve Delivery
-              </Button>
-              <Button variant="outline-danger" size="sm">Request Revisions</Button>
-            </div>
-          )}
+        </div>
+        <Pill tone={status.tone}>{status.label}</Pill>
+      </div>
 
-          <div className="mt-2">
-            <small className="text-muted fw-bold">Milestones:</small>
-            <ul className="list-unstyled small mt-1">
-              {/* Rendering list with map() */}
-              {project.milestones.map((m) => (
-                <li key={m.id} className={m.completed ? 'text-success fw-bold' : 'text-muted'}>
-                  {m.completed ? '✓' : '○'} {m.name}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Card.Body>
-      </Card>
-    </Col>
+      <div className="d-flex justify-content-between align-items-baseline mb-1">
+        <span className="wm-num" style={{ fontSize: '1.15rem' }}>{money(orderReleased(project))}</span>
+        <span className="text-muted" style={{ fontSize: '0.8rem' }}>
+          released of {money(orderTotal(project))}
+        </span>
+      </div>
+      <EscrowBar released={orderReleased(project)} total={orderTotal(project)} />
+
+      <div className="d-flex justify-content-between mt-2 mb-3" style={{ fontSize: '0.79rem' }}>
+        <span className="text-muted">
+          <span className="wm-num" style={{ fontSize: '0.82rem', color: 'var(--amber)' }}>
+            {money(orderEscrow(project))}
+          </span> in escrow
+        </span>
+        <span className="text-muted">{orderProgress(project)}% complete</span>
+      </div>
+
+      <div className="d-flex justify-content-between align-items-center pt-3 border-top" style={{ fontSize: '0.8rem' }}>
+        <span className="text-muted">
+          {done ? `Delivered ${shortDate(project.deadline)}` : deadlineLabel(project.deadline)}
+        </span>
+        {!done && <Pill tone={deadlineTone(project.deadline)}>{project.milestones.length} milestones</Pill>}
+      </div>
+
+      {action && (
+        <div className="wm-note wm-note--danger mt-3 mb-0">
+          <strong>Needs you</strong>
+          {action.label}
+        </div>
+      )}
+
+      <div className="mt-auto pt-3">
+        <Button
+          variant={action ? 'primary' : 'outline-secondary'}
+          size="sm"
+          className="w-100"
+          onClick={() => onOpen(project.id)}
+        >
+          Open project
+          {unread > 0 && <span className="ms-2"><Icon name="chat" size={12} /> {unread}</span>}
+        </Button>
+      </div>
+    </div>
   );
 };
 

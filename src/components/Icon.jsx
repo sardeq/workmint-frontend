@@ -1,7 +1,6 @@
 import React from 'react';
 
-/* Small inline icon set so we don't pull in another dependency.
-   Usage: <Icon name="briefcase" />  or  <Icon name="check" size={14} /> */
+
 
 const shapes = {
   grid: <><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></>,

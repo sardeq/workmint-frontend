@@ -1,107 +1,185 @@
-import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
-// Removed Tabs, Tab[cite: 4]
-import { Card, Row, Form } from 'react-bootstrap'; 
-import Layout from '../../components/Layout';
-import { UserContext } from '../../App';
+import React, { useState, useContext } from 'react';
+import { Spinner } from 'react-bootstrap';
 
-import ProjectCard from './components/ProjectCard'; //[cite: 4]
-import PostJobForm from './components/PostJobForm'; //[cite: 4]
-import ClientOverview from './components/ClientOverview'; //[cite: 4]
-import FindFreelancers from './components/FindFreelancers'; //[cite: 4]
+import Layout from '../../components/Layout';
+import Conversations from '../../components/Conversations';
+import { UserContext } from '../../App';
+import { useWorkspace } from '../../data/WorkspaceContext';
+
+import ClientOverview from './components/ClientOverview';
+import ClientProjects from './components/ClientProjects';
+import ProjectDetails from './components/ProjectDetails';
+import ProposalsInbox from './components/ProposalsInbox';
+import PostJobForm from './components/PostJobForm';
+import FindFreelancers from './components/FindFreelancers';
+import Payments from './components/Payments';
+
+import { unreadCount, clientNeedsAttention } from '../../data/freelancerData';
+
+const PAGE_COPY = {
+  'Overview': ['Your workspace', 'What needs a decision from you, in order of urgency'],
+  'My Projects': ['My projects', 'Live contracts and where the money sits'],
+  'Proposals': ['Proposals', 'Freelancers who applied to your jobs'],
+  'Post a Job': ['Post a job', 'Describe the work and set the milestones'],
+  'Find Freelancers': ['Find freelancers', 'Search the directory and invite someone directly'],
+  'Messages': ['Messages', 'One thread per project'],
+  'Payments': ['Payments', 'Funded, released, and still in escrow'],
+};
 
 const ClientDashboard = () => {
-  const { currentUser } = useContext(UserContext); //[cite: 4]
-  const [rates, setRates] = useState({}); //[cite: 4]
-  const [selectedCurrency, setSelectedCurrency] = useState('USD'); //[cite: 4]
-  
-  // 1. Create state to track the active sidebar item
-  const [activeTab, setActiveTab] = useState('My Projects');
+  const { currentUser } = useContext(UserContext);
+  const workspace = useWorkspace();
 
-  const [activeProjects, setActiveProjects] = useState([ //[cite: 4]
-    { 
-      id: 'PRJ-01', 
-      title: 'Full-Stack Web App', 
-      freelancer: 'Alex Dev', 
-      progress: 75, 
-      status: 'In Revision', 
-      costUSD: 1200, 
-      milestones: [{ id: 1, name: 'Design', completed: true }, { id: 2, name: 'Backend', completed: false }] 
-    }
-  ]);
+  const [activeTab, setActiveTab] = useState('Overview');
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
-  useEffect(() => {
-    const fetchRates = async () => {
-      try {
-        const response = await axios.get('https://open.er-api.com/v6/latest/USD'); //[cite: 4]
-        setRates(response.data.rates); //[cite: 4]
-      } catch (error) { //[cite: 4]
-        console.error("Error fetching currency rates:", error); //[cite: 4]
-      }
-    };
-    fetchRates(); //[cite: 4]
-  }, []);
+  const {
+    loading, orders: allOrders, jobs, proposals: allProposals, talent, paymentMethods,
+    clientProfile, notifications, markNotificationsRead,
+    sendMessage, markThreadRead,
+    approveMilestone, requestRevision, decideScopeChange,
+    postJob, closeJob, acceptProposal, declineProposal,
+    addPaymentMethod, setPrimaryMethod, notify,
+  } = workspace;
 
-  const handleApproveMilestone = (projectId, milestoneId) => { //[cite: 4]
-    // ... keep your existing logic[cite: 4]
+  const company = clientProfile ? clientProfile.company : '';
+
+  // Same store as the freelancer portal, filtered to this company's side.
+  const orders = allOrders.filter((o) => o.client === company);
+  const myJobs = jobs.filter((j) => j.postedBy === company);
+  const proposals = allProposals.filter((p) => p.client === company);
+  const myNotifications = notifications.filter((n) => n.audience === 'client');
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSelectedOrderId(null);
   };
 
-  const handlePostJob = (newJob) => { //[cite: 4]
-    // ... keep your existing logic[cite: 4]
+  const openProject = (orderId) => {
+    setActiveTab('My Projects');
+    setSelectedOrderId(orderId);
   };
 
-  // 2. Render the correct view based on the activeTab state
+  const selectedOrder = orders.find((o) => o.id === selectedOrderId) || null;
+
+  const badges = {
+    'My Projects': orders.filter(clientNeedsAttention).length,
+    'Proposals': proposals.filter((p) => p.status === 'Pending').length,
+    'Messages': orders.reduce((sum, o) => sum + unreadCount(o, 'client'), 0),
+  };
+
+  const [pageTitle, pageSub] = PAGE_COPY[activeTab] || PAGE_COPY.Overview;
+  const firstName = currentUser ? currentUser.name.split(' ')[0] : 'there';
+
+  const handleHire = (proposalId) => {
+    const order = acceptProposal(proposalId);
+    if (order) openProject(order.id);
+  };
+
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="text-center py-5">
+          <Spinner animation="border" style={{ color: 'var(--mint-primary)' }} />
+          <p className="text-muted mt-3 mb-0" style={{ fontSize: '0.9rem' }}>Loading your workspace...</p>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'Overview':
-        return <ClientOverview projects={activeProjects} />;
-      case 'My Projects':
         return (
-          <>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="fw-bold m-0">Active Projects</h5>
-              <Form.Select 
-                size="sm" 
-                style={{ width: 'auto' }} 
-                value={selectedCurrency} 
-                onChange={(e) => setSelectedCurrency(e.target.value)}
-              >
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="JOD">JOD</option>
-              </Form.Select>
-            </div>
-            <Row>
-              {activeProjects.map(project => (
-                <ProjectCard 
-                  key={project.id} 
-                  project={project} 
-                  rates={rates} 
-                  currency={selectedCurrency} 
-                  onApprove={handleApproveMilestone} 
-                />
-              ))}
-            </Row>
-          </>
+          <ClientOverview
+            orders={orders}
+            jobs={myJobs}
+            proposals={proposals}
+            profile={clientProfile}
+            onOpenProject={openProject}
+            onGo={handleTabChange}
+          />
         );
+
+      case 'My Projects':
+        return selectedOrder ? (
+          <ProjectDetails
+            order={selectedOrder}
+            onBack={() => setSelectedOrderId(null)}
+            onApprove={approveMilestone}
+            onRequestRevision={requestRevision}
+            onDecideScope={decideScopeChange}
+            onSend={sendMessage}
+            onRead={markThreadRead}
+          />
+        ) : (
+          <ClientProjects orders={orders} onOpen={openProject} onGo={handleTabChange} />
+        );
+
+      case 'Proposals':
+        return (
+          <ProposalsInbox
+            jobs={myJobs}
+            proposals={proposals}
+            onHire={handleHire}
+            onDecline={declineProposal}
+            onCloseJob={closeJob}
+            onGo={handleTabChange}
+          />
+        );
+
+      case 'Post a Job':
+        return (
+          <PostJobForm
+            onPostJob={(form) => { postJob(form); handleTabChange('Proposals'); }}
+          />
+        );
+
       case 'Find Freelancers':
-        return <FindFreelancers />;
-      case 'Post Job':
-        return <PostJobForm onPostJob={handlePostJob} />;
+        return (
+          <FindFreelancers
+            talent={talent}
+            jobs={myJobs}
+            onInvite={(person, job) => notify(`Invitation sent to ${person.name} for "${job.title}"`)}
+            onGo={handleTabChange}
+          />
+        );
+
       case 'Messages':
-        return <div>Messages Module Coming Soon...</div>;
+        return (
+          <Conversations
+            orders={orders}
+            role="client"
+            onSend={sendMessage}
+            onRead={markThreadRead}
+            onOpenOrder={openProject}
+          />
+        );
+
+      case 'Payments':
+        return (
+          <Payments
+            orders={orders}
+            methods={paymentMethods}
+            onAddMethod={addPaymentMethod}
+            onSetPrimary={setPrimaryMethod}
+          />
+        );
+
       default:
-        return <ClientOverview projects={activeProjects} />;
+        return null;
     }
   };
 
   return (
-    // 3. Pass the state and setter to the Layout component
-    <Layout user={currentUser} title="Client Workspace" activeTab={activeTab} setActiveTab={setActiveTab}>
-      <Card className="border-0 shadow-sm rounded-4 p-4">
-        {renderContent()}
-      </Card>
+    <Layout
+      title={selectedOrder ? selectedOrder.project : activeTab === 'Overview' ? `Welcome back, ${firstName}` : pageTitle}
+      subtitle={selectedOrder ? `${selectedOrder.id} with ${selectedOrder.freelancer.name}` : pageSub}
+      activeTab={activeTab}
+      setActiveTab={handleTabChange}
+      badges={badges}
+      notifications={myNotifications}
+      onReadNotifications={() => markNotificationsRead('client')}
+    >
+      {renderContent()}
     </Layout>
   );
 };

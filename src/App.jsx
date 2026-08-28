@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './style/index.css';
 
+import { WorkspaceProvider } from './data/WorkspaceContext';
 import Landing from './components/Landing';
 import ClientDashboard from './pages/client/ClientDashboard';
 import FreelancerDashboard from './pages/Freelancer/FreelancerDashboard';
@@ -25,15 +26,17 @@ function App() {
 
   return (
     <UserContext.Provider value={{ currentUser, setCurrentUser }}>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Landing onLogin={handleAuth} />} />
-          <Route path="/client" element={<ClientDashboard />} />
-          <Route path="/freelancer" element={<FreelancerDashboard />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
+      <WorkspaceProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Landing onLogin={handleAuth} />} />
+            <Route path="/client" element={<ClientDashboard />} />
+            <Route path="/freelancer" element={<FreelancerDashboard />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </WorkspaceProvider>
     </UserContext.Provider>
   );
 }
