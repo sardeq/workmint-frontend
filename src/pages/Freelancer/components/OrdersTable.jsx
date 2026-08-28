@@ -1,49 +1,135 @@
-import React from 'react';
-import { Table, Badge, Button } from 'react-bootstrap';
+import React, { useState } from 'react';
+import { Table, Button, Form, InputGroup } from 'react-bootstrap';
+import Icon from '../../../components/Icon';
+import { Pill, Avatar, EmptyState, EscrowBar } from '../../../components/Shared';
+import {
+  money, shortDate, deadlineLabel, deadlineTone,
+  orderStatus, orderTotal, orderReleased, orderProgress, unreadCount, needsAttention,
+} from '../../../data/freelancerData';
 
-const OrdersTable = ({ orders, onUpdateStatus }) => {
+const FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'action', label: 'Needs you' },
+  { key: 'awaiting', label: 'With client' },
+  { key: 'completed', label: 'Completed' },
+];
+
+const OrdersTable = ({ orders, onOpen }) => {
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+
+  const matchesFilter = (order) => {
+    const status = orderStatus(order).key;
+    if (filter === 'all') return true;
+    if (filter === 'completed') return status === 'completed';
+    if (filter === 'awaiting') return status === 'awaiting';
+    return needsAttention(order);
+  };
+
+  const visible = orders
+    .filter(matchesFilter)
+    .filter((o) => {
+      const q = search.toLowerCase();
+      return o.project.toLowerCase().includes(q) || o.client.toLowerCase().includes(q) || o.id.toLowerCase().includes(q);
+    })
+    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+
   return (
-    <Table hover responsive className="align-middle">
-      <thead className="table-light">
-        <tr>
-          <th>Order</th><th>Project</th><th>Client</th>
-          <th>Deadline</th><th>Value</th><th>Status</th>
-          <th className="text-end">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {/* Rendering list with map() */}
-        {orders.map((order) => (
-          <tr key={order.id}>
-            <td className="fw-bold text-muted">{order.id}</td>
-            <td className="fw-semibold">{order.project}</td>
-            <td>{order.client}</td>
-            <td>{order.deadline}</td>
-            <td className="text-success fw-bold">{order.price}</td>
-            <td>
-              <Badge bg={order.status === 'Completed' ? 'success' : order.status === 'In Progress' ? 'primary' : 'warning'}>
-                {order.status}
-              </Badge>
-            </td>
-            <td className="text-end">
-              {/* Conditional Rendering: Only show button if In Progress */}
-              {order.status === 'In Progress' && (
-                <Button 
-                  variant="outline-primary" 
-                  size="sm" 
-                  onClick={() => onUpdateStatus(order.id, 'Pending Review')}
-                >
-                  Submit Deliverable
-                </Button>
-              )}
-              {order.status === 'Pending Review' && (
-                <span className="text-muted small">Awaiting Client</span>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
+    <div className="wm-panel wm-panel--flush">
+      <div className="wm-panel__head d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div className="wm-chips">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              className={`wm-chip ${filter === f.key ? 'active' : ''}`}
+              onClick={() => setFilter(f.key)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <InputGroup style={{ maxWidth: 280 }}>
+          <InputGroup.Text style={{ background: 'transparent', borderRight: 0 }}>
+            <Icon name="search" size={14} />
+          </InputGroup.Text>
+          <Form.Control
+            placeholder="Search project, client or ID"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ borderLeft: 0 }}
+          />
+        </InputGroup>
+      </div>
+
+      {visible.length === 0 ? (
+        <EmptyState
+          icon="briefcase"
+          title="No orders here"
+          body={search ? `Nothing matches "${search}".` : 'Orders appear once a client accepts one of your proposals.'}
+        />
+      ) : (
+        <Table hover responsive className="align-middle">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Escrow released</th>
+              <th>Value</th>
+              <th>Deadline</th>
+              <th>Status</th>
+              <th className="text-end">Workspace</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((order) => {
+              const status = orderStatus(order);
+              const unread = unreadCount(order);
+              return (
+                <tr key={order.id} style={{ cursor: 'pointer' }} onClick={() => onOpen(order.id)}>
+                  <td>
+                    <div className="d-flex align-items-center gap-2">
+                      <Avatar name={order.client} size={34} tone="slate" />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{order.project}</div>
+                        <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                          {order.id} &middot; {order.client}
+                          {unread > 0 && <span style={{ color: 'var(--mint-deep)', fontWeight: 600 }}> &middot; {unread} new</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ minWidth: 150 }}>
+                    <div className="d-flex justify-content-between" style={{ fontSize: '0.78rem' }}>
+                      <span className="wm-num" style={{ fontSize: '0.82rem' }}>{money(orderReleased(order))}</span>
+                      <span className="text-muted">{orderProgress(order)}%</span>
+                    </div>
+                    <div className="mt-1"><EscrowBar released={orderReleased(order)} total={orderTotal(order)} /></div>
+                  </td>
+                  <td className="wm-num">{money(orderTotal(order))}</td>
+                  <td>
+                    {status.key === 'completed' ? (
+                      <Pill tone="muted">Delivered {shortDate(order.deadline)}</Pill>
+                    ) : (
+                      <Pill tone={deadlineTone(order.deadline)}>{deadlineLabel(order.deadline)}</Pill>
+                    )}
+                  </td>
+                  <td><Pill tone={status.tone}>{status.label}</Pill></td>
+                  <td className="text-end">
+                    <Button
+                      size="sm"
+                      variant={status.key === 'completed' ? 'outline-secondary' : 'primary'}
+                      onClick={(e) => { e.stopPropagation(); onOpen(order.id); }}
+                    >
+                      Open <Icon name="chevron" size={13} />
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </Table>
+      )}
+    </div>
   );
 };
 
