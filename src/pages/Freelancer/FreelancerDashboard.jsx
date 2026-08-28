@@ -17,8 +17,6 @@ import ProfileEdit from './components/ProfileEdit';
 
 import { buildSeed, uid, unreadCount, needsAttention, money } from '../../data/freelancerData';
 
-/* Flip to true when the backend exists. The seed data in freelancerData.js is
-   already shaped like the response this endpoint should return. */
 const USE_API = false;
 
 const PAGE_COPY = {
