@@ -11,17 +11,17 @@ import Mission from './Mission';
 import Footer from './Footer';
 import '../style/landing.css';
 
-const Landing = ({ onLogin }) => {
+const Landing = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
 
   const navigate = useNavigate();
 
-  const enterAs = (role) => {
-    onLogin(role);
-    navigate(`/${role}`);
-  };
+  /* Both closing CTAs land on registration with the right side pre-selected. */
+  const joinAs = (role) => navigate(`/register?role=${role}`);
 
+  /* Search filters the talent section and scrolls to it. The old version
+     popped an alert(), which is not an answer to anything. */
   const handleSearch = (e) => {
     e.preventDefault();
     setSubmittedQuery(searchQuery);
@@ -31,7 +31,7 @@ const Landing = ({ onLogin }) => {
 
   return (
     <div className="landing-page">
-      <Navbar onLogin={onLogin} />
+      <Navbar />
 
       <Hero
         searchQuery={searchQuery}
@@ -42,8 +42,8 @@ const Landing = ({ onLogin }) => {
       <HowItWorks />
       <ValueProp />
       <EscrowCalculator />
-      <FreelancerGrid query={submittedQuery} onEnter={enterAs} />
-      <Mission onEnter={enterAs} />
+      <FreelancerGrid query={submittedQuery} onJoin={joinAs} />
+      <Mission onJoin={joinAs} />
       <Footer />
     </div>
   );

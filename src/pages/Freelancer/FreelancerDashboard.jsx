@@ -11,10 +11,9 @@ import OrdersTable from './components/OrdersTable';
 import ProjectWorkspace from './components/ProjectWorkspace';
 import AvailableJobs from './components/AvailableJobs';
 import MyProposals from './components/MyProposals';
+import Earnings from './components/Earnings';
 import Portfolio from './components/Portfolio';
 import ProfileEdit from './components/ProfileEdit';
-import Earnings from './components/Earnings';
-
 
 import { unreadCount, needsAttention } from '../../data/freelancerData';
 
@@ -39,13 +38,14 @@ const FreelancerDashboard = () => {
   const {
     loading, orders: allOrders, jobs, proposals: allProposals, portfolio, withdrawals,
     profile, savedJobIds, notifications, markNotificationsRead,
-    sendMessage, markThreadRead,
+    sendMessage, markThreadRead, raiseDispute,
     startMilestone, submitDeliverable, requestScopeChange, applyToJob, withdrawProposal,
     toggleSaveJob, savePortfolioItem, deletePortfolioItem, saveProfile, requestWithdrawal,
   } = workspace;
 
   const me = profile ? profile.name : '';
 
+  // The shared store holds both sides of the marketplace; take this side of it.
   const orders = allOrders.filter((o) => o.freelancer && o.freelancer.name === me);
   const proposals = allProposals.filter((p) => p.freelancer && p.freelancer.name === me);
   const myNotifications = notifications.filter((n) => n.audience === 'freelancer');
@@ -104,6 +104,7 @@ const FreelancerDashboard = () => {
             onScopeChange={requestScopeChange}
             onSend={sendMessage}
             onRead={markThreadRead}
+            onRaiseDispute={raiseDispute}
           />
         ) : (
           <OrdersTable orders={orders} onOpen={openOrder} />

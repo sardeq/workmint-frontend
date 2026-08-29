@@ -1,34 +1,195 @@
 import React, { useState } from 'react';
-import { Table, Badge, Button } from 'react-bootstrap';
+import { Table, Button, Form, InputGroup, Modal, Row, Col } from 'react-bootstrap';
+import Icon from '../../../components/Icon';
+import { Pill, StatCard, EmptyState } from '../../../components/Shared';
+import {
+  money, timeAgo, shortDate, deadlineLabel, deadlineTone,
+  orderStatus, orderTotal, orderEscrow, orderReleased,
+} from '../../../data/freelancerData';
 
-const JobManagement = () => {
-  const [jobs, setJobs] = useState([
-    { id: 1, title: 'React Dev', client: 'Client A', status: 'open' },
-    { id: 2, title: 'Python API', client: 'Client B', status: 'closed' },
-  ]);
+const VIEWS = [
+  { key: 'jobs', label: 'Open listings' },
+  { key: 'contracts', label: 'Live contracts' },
+];
 
-  const toggleStatus = (id) => {
-    setJobs(jobs.map(j => j.id === id ? { ...j, status: j.status === 'open' ? 'closed' : 'open' } : j));
-  };
+const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
+  const [view, setView] = useState('jobs');
+  const [search, setSearch] = useState('');
+  const [removing, setRemoving] = useState(null);
+
+  const active = orders.filter((o) => orderStatus(o).key !== 'completed');
+  const gmv = orders.reduce((sum, o) => sum + orderTotal(o), 0);
+
+  const matches = (text) => text.toLowerCase().includes(search.toLowerCase());
+
+  const visibleJobs = jobs.filter((j) => matches(j.title) || matches(j.client));
+  const visibleOrders = orders.filter(
+    (o) => matches(o.project) || matches(o.client) || matches(o.freelancer.name) || matches(o.id)
+  );
 
   return (
-    <Table hover>
-      <thead><tr><th>Title</th><th>Client</th><th>Status</th><th>Action</th></tr></thead>
-      <tbody>
-        {jobs.map(j => (
-          <tr key={j.id}>
-            <td>{j.title}</td>
-            <td>{j.client}</td>
-            <td><Badge bg={j.status === 'open' ? 'success' : 'secondary'}>{j.status}</Badge></td>
-            <td>
-              <Button variant="outline-primary" size="sm" onClick={() => toggleStatus(j.id)}>
-                {j.status === 'open' ? 'Close' : 'Reopen'}
+    <>
+      <Row className="g-3 mb-4">
+        <Col sm={3}>
+          <StatCard label="Open listings" value={jobs.length} icon="search" tone="info" sub="Visible in the marketplace" />
+        </Col>
+        <Col sm={3}>
+          <StatCard label="Live contracts" value={active.length} icon="briefcase" tone="warn" sub={`${orders.length} all time`} />
+        </Col>
+        <Col sm={3}>
+          <StatCard label="Contract volume" value={money(gmv)} icon="dollar" tone="success" sub="Total value ever funded" />
+        </Col>
+        <Col sm={3}>
+          <StatCard
+            label="Live proposals" icon="send" tone="muted"
+            value={proposals.filter((p) => p.status === 'Pending').length}
+            sub="Awaiting a client decision"
+          />
+        </Col>
+      </Row>
+
+      <div className="wm-panel wm-panel--flush">
+        <div className="wm-panel__head d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div className="wm-chips">
+            {VIEWS.map((v) => (
+              <button key={v.key} type="button" className={`wm-chip ${view === v.key ? 'active' : ''}`} onClick={() => setView(v.key)}>
+                {v.label}
+                <span className="wm-chip__count">{v.key === 'jobs' ? jobs.length : orders.length}</span>
+              </button>
+            ))}
+          </div>
+          <InputGroup style={{ maxWidth: 280 }}>
+            <InputGroup.Text style={{ background: 'transparent', borderRight: 0 }}>
+              <Icon name="search" size={14} />
+            </InputGroup.Text>
+            <Form.Control
+              placeholder={view === 'jobs' ? 'Title or client' : 'Project, party or ID'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ borderLeft: 0 }}
+            />
+          </InputGroup>
+        </div>
+
+        {view === 'jobs' ? (
+          visibleJobs.length === 0 ? (
+            <EmptyState icon="search" title="No listings" body="Nothing is open on the marketplace right now." />
+          ) : (
+            <Table hover responsive className="align-middle">
+              <thead>
+                <tr>
+                  <th>Listing</th>
+                  <th>Client</th>
+                  <th>Budget</th>
+                  <th>Proposals</th>
+                  <th>Posted</th>
+                  <th className="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleJobs.map((job) => {
+                  const bids = proposals.filter((p) => p.jobId === job.id).length;
+                  return (
+                    <tr key={job.id}>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{job.title}</div>
+                        <div className="wm-chips mt-1">
+                          {job.skills.slice(0, 3).map((s) => <span className="wm-tag" key={s}>{s}</span>)}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontSize: '0.87rem' }}>{job.client}</div>
+                        <div className="text-muted" style={{ fontSize: '0.77rem' }}>
+                          <Icon name="star" size={11} /> {job.clientRating}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="wm-num">{money(job.budget)}</span>
+                        <div className="text-muted" style={{ fontSize: '0.77rem' }}>{job.days} days</div>
+                      </td>
+                      <td><Pill tone={bids > 0 ? 'info' : 'muted'}>{bids}</Pill></td>
+                      <td className="text-muted" style={{ fontSize: '0.83rem' }}>
+                        {timeAgo(new Date(Date.now() - job.postedHours * 3600000).toISOString())}
+                      </td>
+                      <td className="text-end">
+                        <Button size="sm" variant="outline-secondary" onClick={() => setRemoving(job)}>
+                          Remove
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          )
+        ) : visibleOrders.length === 0 ? (
+          <EmptyState icon="briefcase" title="No contracts" body="Nothing matches that search." />
+        ) : (
+          <Table hover responsive className="align-middle">
+            <thead>
+              <tr>
+                <th>Contract</th>
+                <th>Parties</th>
+                <th>Escrow</th>
+                <th>Released</th>
+                <th>Deadline</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleOrders.map((order) => {
+                const status = orderStatus(order);
+                const done = status.key === 'completed';
+                return (
+                  <tr key={order.id}>
+                    <td>
+                      <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{order.project}</div>
+                      <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                        {order.id} &middot; {order.milestones.length} milestones
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '0.85rem' }}>{order.client}</div>
+                      <div className="text-muted" style={{ fontSize: '0.78rem' }}>{order.freelancer.name}</div>
+                    </td>
+                    <td className="wm-num" style={{ color: orderEscrow(order) > 0 ? 'var(--amber)' : 'inherit' }}>
+                      {money(orderEscrow(order))}
+                    </td>
+                    <td className="wm-num">{money(orderReleased(order))}</td>
+                    <td>
+                      {done ? (
+                        <span className="text-muted" style={{ fontSize: '0.83rem' }}>{shortDate(order.deadline)}</span>
+                      ) : (
+                        <Pill tone={deadlineTone(order.deadline)}>{deadlineLabel(order.deadline)}</Pill>
+                      )}
+                    </td>
+                    <td><Pill tone={status.tone}>{status.label}</Pill></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        )}
+      </div>
+
+      <Modal show={Boolean(removing)} onHide={() => setRemoving(null)} centered size="sm">
+        {removing && (
+          <Modal.Body className="text-center p-4">
+            <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>Remove "{removing.title}"?</h6>
+            <p className="text-muted" style={{ fontSize: '0.86rem' }}>
+              It disappears from the marketplace and any open proposals on it are declined.
+            </p>
+            <div className="d-flex gap-2 justify-content-center">
+              <Button size="sm" variant="outline-secondary" onClick={() => setRemoving(null)}>Keep it</Button>
+              <Button size="sm" variant="primary" onClick={() => { onCloseJob(removing.id); setRemoving(null); }}>
+                Remove listing
               </Button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
+            </div>
+          </Modal.Body>
+        )}
+      </Modal>
+    </>
   );
 };
+
 export default JobManagement;

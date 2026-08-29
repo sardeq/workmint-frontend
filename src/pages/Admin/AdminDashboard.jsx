@@ -1,91 +1,134 @@
-import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
-import { Card } from 'react-bootstrap'; // Removed Tabs and Tab[cite: 3]
+import React, { useState } from 'react';
+import { Spinner } from 'react-bootstrap';
+
 import Layout from '../../components/Layout';
-import { UserContext } from '../../App';
-import AdminStats from './components/AdminStats';
-import DisputesList from './components/DisputesList';
-import DisputeModal from './components/DisputeModal';
+import { useAuth } from '../../data/AuthContext';
+import { useWorkspace } from '../../data/WorkspaceContext';
 
 import AdminOverview from './components/AdminOverview';
+import DisputesList from './components/DisputesList';
+import DisputeModal from './components/DisputeModal';
+import Approvals from './components/Approvals';
 import UserManagement from './components/UserManagement';
 import JobManagement from './components/JobManagement';
+import Analytics from './components/Analytics';
+
+const PAGE_COPY = {
+  'Overview': ['Control centre', 'Platform health and everything queued for a decision'],
+  'Disputes': ['Disputes', 'Frozen escrow waiting on a mediator'],
+  'Approvals': ['Freelancer approvals', 'Accounts waiting to be screened'],
+  'Users': ['Users', 'Every account on the platform'],
+  'Jobs': ['Jobs and contracts', 'Marketplace listings and live contracts'],
+  'Analytics': ['Analytics', 'Volume, fees and where the money sits'],
+};
 
 const AdminDashboard = () => {
-  const { currentUser } = useContext(UserContext); //[cite: 3]
-  const [exchangeRate, setExchangeRate] = useState(1); //[cite: 3]
-  const [showModal, setShowModal] = useState(false); //[cite: 3]
-  const [selectedDispute, setSelectedDispute] = useState(null); //[cite: 3]
+  const { users, currentUser, setUserStatus } = useAuth();
+  const {
+    loading, orders, jobs, proposals, disputes,
+    markNotificationsRead, resolveDispute, setDisputeStatus, closeJob,
+  } = useWorkspace();
 
-  // Track the active sidebar item
-  const [activeTab, setActiveTab] = useState('Disputes'); 
+  const [activeTab, setActiveTab] = useState('Overview');
+  const [selectedDispute, setSelectedDispute] = useState(null);
 
-  const [disputes, setDisputes] = useState([ //[cite: 3]
-    { id: 'DSP-901', client: 'Alpha Corp', freelancer: 'John Doe', amount: 1500, reason: 'Scope creep / Delayed milestone', status: 'Open' }, //[cite: 3]
-    { id: 'DSP-902', client: 'Zenith Apps', freelancer: 'Elena Rostova', amount: 820, reason: 'Incomplete API documentation', status: 'Under Review' } //[cite: 3]
-  ]);
+  const openDisputes = disputes.filter((d) => d.status !== 'Resolved');
+  const pendingUsers = users.filter((u) => u.status === 'pending');
 
-  useEffect(() => {
-    axios.get('https://open.er-api.com/v6/latest/USD') //[cite: 3]
-      .then(res => setExchangeRate(res.data.rates.EUR || 1)) //[cite: 3]
-      .catch(err => console.error(err)); //[cite: 3]
-  }, []);
-
-  const handleResolveDispute = (id, resolution) => { //[cite: 3]
-    setDisputes(prev => prev.map(d => 
-      d.id === id ? { ...d, status: `Resolved (${resolution})` } : d //[cite: 3]
-    ));
-    setShowModal(false); //[cite: 3]
+  const badges = {
+    'Disputes': openDisputes.length,
+    'Approvals': pendingUsers.length,
   };
 
-  const openModal = (dispute) => { //[cite: 3]
-    setSelectedDispute(dispute); //[cite: 3]
-    setShowModal(true); //[cite: 3]
+  /* Admin notifications are the queues, not per-contract chatter. */
+  const adminFeed = [
+    ...openDisputes.map((d) => ({
+      id: `AN-${d.id}`, at: d.openedAt, read: false,
+      text: `${d.id}: ${d.reason} (${d.client} vs ${d.freelancer})`,
+    })),
+    ...pendingUsers.map((u) => ({
+      id: `AN-${u.id}`, at: u.joinedAt, read: false,
+      text: `${u.name} applied as a freelancer`,
+    })),
+  ].sort((a, b) => new Date(b.at) - new Date(a.at));
+
+  const [pageTitle, pageSub] = PAGE_COPY[activeTab] || PAGE_COPY.Overview;
+  const firstName = currentUser ? currentUser.name.split(' ')[0] : 'there';
+
+  const handleResolve = (disputeId, outcome, note) => {
+    resolveDispute(disputeId, outcome, note);
+    setSelectedDispute(null);
   };
 
-  // Render content based on sidebar state
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="text-center py-5">
+          <Spinner animation="border" style={{ color: 'var(--mint-primary)' }} />
+          <p className="text-muted mt-3 mb-0" style={{ fontSize: '0.9rem' }}>Loading platform data...</p>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'Overview':
-        return <AdminOverview />;
-      case 'Disputes':
         return (
-          <DisputesList 
-            disputes={disputes} 
-            exchangeRate={exchangeRate} 
-            onReview={openModal} 
+          <AdminOverview
+            orders={orders}
+            jobs={jobs}
+            users={users}
+            disputes={disputes}
+            proposals={proposals}
+            onReviewDispute={setSelectedDispute}
+            onGo={setActiveTab}
           />
         );
-      case 'User Management':
-        return <UserManagement />;
-      case 'Jobs': // Fallback for your original Jobs component[cite: 3]
-        return <JobManagement />;
-      case 'Freelancer Approvals':
-        return <div>Freelancer Approvals Module Coming Soon...</div>;
+
+      case 'Disputes':
+        return (
+          <DisputesList
+            disputes={disputes}
+            orders={orders}
+            onReview={setSelectedDispute}
+            onTriage={setDisputeStatus}
+          />
+        );
+
+      case 'Approvals':
+        return <Approvals users={users} onDecide={setUserStatus} onGo={setActiveTab} />;
+
+      case 'Users':
+        return <UserManagement users={users} orders={orders} onSetStatus={setUserStatus} />;
+
+      case 'Jobs':
+        return <JobManagement jobs={jobs} orders={orders} proposals={proposals} onCloseJob={closeJob} />;
+
       case 'Analytics':
-        return <div>Analytics Module Coming Soon...</div>;
+        return <Analytics orders={orders} users={users} disputes={disputes} jobs={jobs} />;
+
       default:
-        return <AdminOverview />;
+        return null;
     }
   };
 
   return (
-    // Pass activeTab and setActiveTab to Layout[cite: 2, 3]
-    <Layout user={currentUser} title="Admin Control Center" activeTab={activeTab} setActiveTab={setActiveTab}>
-      <AdminStats 
-        exchangeRate={exchangeRate} 
-        activeDisputes={disputes.filter(d => !d.status.includes('Resolved')).length} 
-      />
+    <Layout
+      title={activeTab === 'Overview' ? `Welcome back, ${firstName}` : pageTitle}
+      subtitle={pageSub}
+      activeTab={activeTab}
+      setActiveTab={(tab) => { setActiveTab(tab); setSelectedDispute(null); }}
+      badges={badges}
+      notifications={adminFeed}
+      onReadNotifications={() => markNotificationsRead('admin')}
+    >
+      {renderContent()}
 
-      <Card className="border-0 shadow-sm rounded-4 p-4 mt-4">
-        {renderContent()}
-      </Card>
-
-      <DisputeModal 
-        show={showModal} 
-        onHide={() => setShowModal(false)} 
-        dispute={selectedDispute} 
-        onResolve={handleResolveDispute} 
+      <DisputeModal
+        show={Boolean(selectedDispute)}
+        dispute={selectedDispute}
+        order={selectedDispute ? orders.find((o) => o.id === selectedDispute.orderId) : null}
+        onHide={() => setSelectedDispute(null)}
+        onResolve={handleResolve}
       />
     </Layout>
   );

@@ -9,7 +9,7 @@ const LINKS = [
   { href: '#talent', label: 'Browse talent' },
 ];
 
-const Navbar = ({ onLogin }) => {
+const Navbar = () => {
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -22,10 +22,9 @@ const Navbar = ({ onLogin }) => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const loginAs = (role) => {
+  const go = (path) => {
     setMenuOpen(false);
-    onLogin(role);
-    navigate(`/${role}`);
+    navigate(path);
   };
 
   return (
@@ -40,9 +39,8 @@ const Navbar = ({ onLogin }) => {
         </div>
 
         <div className="nav-actions">
-          <button type="button" className="wm-btn-ghost" onClick={() => loginAs('admin')}>Admin</button>
-          <button type="button" className="wm-btn wm-btn-outline" onClick={() => loginAs('client')}>Client portal</button>
-          <button type="button" className="wm-btn wm-btn-primary" onClick={() => loginAs('freelancer')}>Freelancer login</button>
+          <button type="button" className="wm-btn wm-btn-outline" onClick={() => go('/login')}>Sign in</button>
+          <button type="button" className="wm-btn wm-btn-primary" onClick={() => go('/register')}>Get started</button>
         </div>
 
         <button
@@ -61,9 +59,8 @@ const Navbar = ({ onLogin }) => {
           <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}>{link.label}</a>
         ))}
         <div className="nav-drawer__actions">
-          <button type="button" className="wm-btn wm-btn-primary" onClick={() => loginAs('freelancer')}>Freelancer login</button>
-          <button type="button" className="wm-btn wm-btn-outline" onClick={() => loginAs('client')}>Client portal</button>
-          <button type="button" className="wm-btn-ghost" onClick={() => loginAs('admin')}>Admin</button>
+          <button type="button" className="wm-btn wm-btn-primary" onClick={() => go('/register')}>Get started</button>
+          <button type="button" className="wm-btn wm-btn-outline" onClick={() => go('/login')}>Sign in</button>
         </div>
       </div>
     </nav>
