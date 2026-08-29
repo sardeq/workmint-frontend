@@ -1,8 +1,7 @@
 import React from 'react';
 import Icon from './Icon';
 
-/* Numbered because the money genuinely moves in this order, and the state
-   label on each step is where the money physically sits at that moment. */
+
 const STEPS = [
   {
     icon: 'file',

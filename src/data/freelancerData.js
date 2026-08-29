@@ -73,22 +73,28 @@ export const MILESTONE_STATUS = {
   submitted: { label: 'Awaiting review', tone: 'warn'    },
   revision:  { label: 'Revision needed', tone: 'danger'  },
   approved:  { label: 'Approved',        tone: 'success' },
+  disputed:  { label: 'In dispute',      tone: 'danger'  },
+  refunded:  { label: 'Refunded',        tone: 'muted'   },
 };
 
 const ORDER_LABELS = {
   progress:  { freelancer: 'In progress',     client: 'In progress',        tone: 'info'    },
   awaiting:  { freelancer: 'Awaiting client', client: 'Needs your review',  tone: 'warn'    },
   revision:  { freelancer: 'Revision needed', client: 'Revision requested', tone: 'danger'  },
+  disputed:  { freelancer: 'In dispute',      client: 'In dispute',         tone: 'danger'  },
   completed: { freelancer: 'Completed',       client: 'Completed',          tone: 'success' },
   cancelled: { freelancer: 'Cancelled',       client: 'Cancelled',          tone: 'muted'   },
 };
 
 export const ORDER_STATUS = ORDER_LABELS;
 
+const settled = (m) => m.status === 'approved' || m.status === 'refunded';
+
 const statusKey = (order) => {
   if (order.cancelled) return 'cancelled';
   const ms = order.milestones;
-  if (ms.length && ms.every((m) => m.status === 'approved')) return 'completed';
+  if (ms.some((m) => m.status === 'disputed')) return 'disputed';
+  if (ms.length && ms.every(settled)) return 'completed';
   if (ms.some((m) => m.status === 'revision')) return 'revision';
   if (ms.some((m) => m.status === 'submitted')) return 'awaiting';
   return 'progress';
@@ -106,12 +112,33 @@ export const orderTotal = (order) => order.milestones.reduce((sum, m) => sum + m
 export const orderReleased = (order) =>
   order.milestones.filter((m) => m.status === 'approved').reduce((sum, m) => sum + m.amount, 0);
 
-export const orderEscrow = (order) => orderTotal(order) - orderReleased(order);
+export const orderRefunded = (order) =>
+  order.milestones.filter((m) => m.status === 'refunded').reduce((sum, m) => sum + m.amount, 0);
+
+/** Money still sitting with Workmint: funded, not yet released or refunded. */
+export const orderEscrow = (order) =>
+  orderTotal(order) - orderReleased(order) - orderRefunded(order);
 
 export const orderProgress = (order) => {
-  const total = orderTotal(order);
-  return total === 0 ? 0 : Math.round((orderReleased(order) / total) * 100);
+  const payable = orderTotal(order) - orderRefunded(order);
+  return payable === 0 ? 0 : Math.round((orderReleased(order) / payable) * 100);
 };
+
+/** A milestone can be disputed by either side while the money is still held. */
+export const canDispute = (milestone) =>
+  milestone.status !== 'approved' && milestone.status !== 'refunded' && milestone.status !== 'disputed';
+
+export const DISPUTE_STATUS = {
+  'Open': { tone: 'danger' },
+  'Under review': { tone: 'warn' },
+  'Resolved': { tone: 'success' },
+};
+
+export const DISPUTE_OUTCOMES = [
+  { key: 'release', label: 'Release to freelancer', body: 'The work stands. The full milestone is paid out.' },
+  { key: 'refund', label: 'Refund the client', body: 'The milestone is cancelled and the money leaves escrow back to the client.' },
+  { key: 'split', label: 'Split it evenly', body: 'Half is released to the freelancer, half is refunded. Used when both sides are partly right.' },
+];
 
 /* ---------- messages ----------
    `from` is a role. A message is "read" once the other side has opened the
@@ -266,7 +293,7 @@ export const buildSeed = () => ({
       deadline: dayOffset(3),
       revisionsIncluded: 2,
       milestones: [
-        { id: 'MS-4', title: 'Catalogue & cart screens', amount: 1500, dueDate: dayOffset(-1), status: 'submitted', revisionsUsed: 0, deliverable: { link: 'https://expo.dev/@demo/northwind-preview', note: 'Expo build, test account in the shared doc.', at: hoursAgo(20) } },
+        { id: 'MS-4', title: 'Catalogue & cart screens', amount: 1500, dueDate: dayOffset(-1), status: 'disputed', revisionsUsed: 0, deliverable: { link: 'https://expo.dev/@demo/northwind-preview', note: 'Expo build, test account in the shared doc.', at: hoursAgo(20) } },
         { id: 'MS-5', title: 'Checkout & payments', amount: 1800, dueDate: dayOffset(3), status: 'pending', revisionsUsed: 0 },
       ],
       messages: [
@@ -371,6 +398,41 @@ export const buildSeed = () => ({
 
   withdrawals: [
     { id: 'WD-1', amount: 1440, method: 'Bank transfer', at: hoursAgo(500), status: 'Paid' },
+  ],
+
+  /* ---------- disputes raised on live contracts ---------- */
+  disputes: [
+    {
+      id: 'DSP-901',
+      orderId: 'ORD-901',
+      milestoneId: 'MS-4',
+      project: 'React Native Storefront',
+      client: 'Northwind Retail',
+      freelancer: 'Sadeq Odeh',
+      raisedBy: 'client',
+      amount: 1500,
+      reason: 'Delivery does not match the brief',
+      detail: 'The offline cart loses items when the app is killed mid-session, which was the whole point of the milestone. Freelancer says the brief only covered background suspension.',
+      status: 'Open',
+      openedAt: hoursAgo(16),
+    },
+    {
+      id: 'DSP-902',
+      orderId: 'ORD-877',
+      milestoneId: 'MS-E',
+      project: 'CI Pipeline Migration',
+      client: 'TechCorp',
+      freelancer: 'Karim Aziz',
+      raisedBy: 'freelancer',
+      amount: 1700,
+      reason: 'Approval withheld after delivery',
+      detail: 'Cutover completed and running in production for three weeks before approval came through. Raised to get the release moving.',
+      status: 'Resolved',
+      resolution: 'release',
+      resolutionNote: 'Pipeline verified as live in production. Released in full.',
+      openedAt: hoursAgo(1010),
+      resolvedAt: hoursAgo(985),
+    },
   ],
 
   /* ---------- the client's payment methods ---------- */

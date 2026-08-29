@@ -1,10 +1,3 @@
-/* =========================================================================
-   Workmint design system
-   Loaded AFTER bootstrap.min.css, so anything here wins.
-   Keeps the mint/slate identity from the landing page and extends it into
-   a proper app surface: quieter cards, a real type scale, ledger-style
-   numerals for money, and one signature element (the escrow rail).
-   ========================================================================= */
 
 :root {
   /* brand (unchanged - the landing page depends on these) */
@@ -556,3 +549,109 @@ body {
 /* dropdown toggles that are icon buttons should not draw a caret */
 .wm-icon-btn.dropdown-toggle::after { display: none; }
 .dropdown-menu { box-shadow: var(--shadow-md); }
+
+/* =========================================================================
+   Auth pages
+   Split layout: the brand side states the product thesis, the form side
+   stays quiet. Collapses to the form alone on small screens.
+   ========================================================================= */
+.wm-auth { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+
+.wm-auth__brand {
+  background: var(--slate-dark);
+  color: #94a3b8;
+  padding: clamp(2.5rem, 5vw, 4rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 3rem;
+}
+.wm-auth__logo {
+  display: inline-block;
+  font-size: 1.4rem; font-weight: 800; letter-spacing: -0.04em;
+  color: var(--mint-primary); text-decoration: none; margin-bottom: 3rem;
+}
+.wm-auth__brand h2 {
+  color: #fff; font-size: clamp(1.6rem, 2.6vw, 2.2rem); font-weight: 800;
+  letter-spacing: -0.035em; line-height: 1.15; margin: 0 0 1rem; max-width: 20ch;
+}
+.wm-auth__brand p { font-size: 1rem; line-height: 1.7; margin: 0 0 2rem; max-width: 40ch; }
+.wm-auth__brand .value-list li { color: #cbd5e1; font-size: 0.9rem; }
+
+.wm-auth__figures { display: flex; gap: 2.5rem; }
+.wm-auth__figures .wm-figure { display: block; font-size: 1.5rem; color: #fff; }
+.wm-auth__figures small { font-size: 0.8rem; color: #64748b; }
+
+.wm-auth__form {
+  display: flex; align-items: center; justify-content: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  background: var(--bg-main);
+}
+.wm-auth__card {
+  width: 100%; max-width: 27rem;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+  box-shadow: var(--shadow-sm);
+}
+.wm-auth__back {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.82rem; color: var(--text-muted); text-decoration: none; margin-bottom: 1.25rem;
+}
+.wm-auth__back:hover { color: var(--slate-dark); }
+.wm-auth__title { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.035em; color: var(--slate-dark); margin: 0 0 0.35rem; }
+.wm-auth__sub { font-size: 0.9rem; color: var(--text-muted); margin: 0 0 1.5rem; }
+.wm-auth__sub a { color: var(--mint-deep); font-weight: 600; }
+
+.wm-auth__toggle {
+  border: none; background: none; padding: 0;
+  font-size: 0.78rem; font-weight: 600; color: var(--text-muted); cursor: pointer;
+  margin-bottom: 0.35rem;
+}
+.wm-auth__toggle:hover { color: var(--slate-dark); }
+
+.wm-auth__demo { border-top: 1px solid var(--border-color); padding-top: 1rem; }
+
+.wm-auth__tick {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--mint-light); color: var(--mint-deep); margin-bottom: 1rem;
+}
+
+.wm-role-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.wm-role {
+  text-align: left; cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.wm-role:hover { border-color: #cbd5e1; }
+.wm-role.active { border-color: var(--mint-primary); background: #f0fdf7; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12); }
+.wm-role__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 9px;
+  background: #eef2f6; color: var(--text-muted); margin-bottom: 0.5rem;
+}
+.wm-role.active .wm-role__icon { background: var(--mint-light); color: var(--mint-deep); }
+.wm-role strong { display: block; font-size: 0.88rem; color: var(--slate-dark); }
+.wm-role small { display: block; font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; margin-top: 0.15rem; }
+
+.wm-strength { flex: 1; height: 5px; border-radius: 999px; background: #eef2f6; overflow: hidden; }
+.wm-strength__fill { display: block; height: 100%; border-radius: 999px; transition: width 0.25s ease; }
+.wm-strength__fill--danger { background: var(--red); }
+.wm-strength__fill--warn { background: var(--amber); }
+.wm-strength__fill--info { background: var(--blue); }
+.wm-strength__fill--success { background: var(--mint-primary); }
+
+@media (max-width: 900px) {
+  .wm-auth { grid-template-columns: 1fr; }
+  .wm-auth__brand { display: none; }
+}
+
+/* value-list is defined in landing.css, which the auth page does not load */
+.wm-auth .value-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.7rem; }
+.wm-auth .value-list li { display: flex; gap: 0.6rem; align-items: flex-start; font-size: 0.89rem; }
+.wm-auth .value-list svg { color: var(--mint-primary); flex-shrink: 0; margin-top: 2px; }

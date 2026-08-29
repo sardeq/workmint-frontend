@@ -2,18 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button, Form, Row, Col, Modal, Alert } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, EmptyState, Avatar } from '../../../components/Shared';
+import RaiseDisputeModal from '../../../components/RaiseDisputeModal';
 import {
   money, netOf, shortDate, timeAgo, deadlineLabel, deadlineTone,
   MILESTONE_STATUS, orderStatus, orderTotal, orderReleased, orderEscrow, orderProgress, unreadCount,
 } from '../../../data/freelancerData';
 
-const DOT_ICON = { approved: 'check', active: 'clock', submitted: 'upload', revision: 'revision', pending: 'lock' };
+const DOT_ICON = { approved: 'check', active: 'clock', submitted: 'upload', revision: 'revision', pending: 'lock', disputed: 'alert', refunded: 'back' };
 
-const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onSend, onRead }) => {
+const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onSend, onRead, onRaiseDispute }) => {
   const [tab, setTab] = useState('milestones');
   const [drafts, setDrafts] = useState({});
   const [message, setMessage] = useState('');
   const [showScope, setShowScope] = useState(false);
+  const [showDispute, setShowDispute] = useState(false);
   const [scopeForm, setScopeForm] = useState({ reason: '', extraCost: '', extraDays: '' });
   const [scopeError, setScopeError] = useState('');
 
@@ -187,6 +189,20 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
             </Form>
           )}
 
+          {milestone.status === 'disputed' && (
+            <div className="wm-note wm-note--danger">
+              <strong>Frozen pending mediation</strong>
+              {money(milestone.amount)} stays in escrow until a Workmint mediator decides the case.
+            </div>
+          )}
+
+          {milestone.status === 'refunded' && (
+            <div className="wm-note wm-note--muted">
+              <strong>Refunded to the client</strong>
+              This milestone was returned after mediation and is not payable.
+            </div>
+          )}
+
           {milestone.status === 'submitted' && (
             <div className="wm-note wm-note--muted">
               <strong>With {order.client}</strong>
@@ -233,6 +249,9 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
             </Button>
             <Button variant="outline-primary" size="sm" onClick={() => setShowScope(true)}>
               Request scope change
+            </Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => setShowDispute(true)}>
+              Open a dispute
             </Button>
           </div>
         </div>
@@ -346,6 +365,14 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
           </ul>
         </div>
       )}
+
+      <RaiseDisputeModal
+        show={showDispute}
+        onHide={() => setShowDispute(false)}
+        order={order}
+        role="freelancer"
+        onSubmit={onRaiseDispute}
+      />
 
       {/* ---------- scope change ---------- */}
       <Modal show={showScope} onHide={() => setShowScope(false)} centered>

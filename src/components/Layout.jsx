@@ -1,12 +1,13 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dropdown } from 'react-bootstrap';
-import { UserContext } from '../App';
+import { UserContext } from '../data/AuthContext';
 import Icon from './Icon';
 import { Avatar } from './Shared';
 import { timeAgo } from '../data/freelancerData';
 
-
+/* Nav is data, not JSX. Adding a screen means adding one line here plus one
+   case in the dashboard's renderContent(). */
 const NAV = {
   client: [
     { key: 'Overview', icon: 'grid' },
@@ -30,8 +31,9 @@ const NAV = {
   admin: [
     { key: 'Overview', icon: 'grid' },
     { key: 'Disputes', icon: 'alert' },
-    { key: 'Freelancer Approvals', icon: 'check' },
-    { key: 'User Management', icon: 'user' },
+    { key: 'Approvals', icon: 'check' },
+    { key: 'Users', icon: 'user' },
+    { key: 'Jobs', icon: 'briefcase' },
     { key: 'Analytics', icon: 'trend' },
   ],
 };
@@ -47,12 +49,14 @@ const Layout = ({
   children,
 }) => {
   const navigate = useNavigate();
-  const { currentUser, setCurrentUser } = useContext(UserContext);
+  const { currentUser, logout } = useContext(UserContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleSignOut = () => {
-    setCurrentUser(null);
-    navigate('/');
+    // Signing out on a protected route means the guard redirects anyway, so
+    // send people to the sign-in screen deliberately rather than racing it.
+    logout();
+    navigate('/login');
   };
 
   // Route guard: no session, no workspace.
@@ -61,8 +65,8 @@ const Layout = ({
       <div className="wm-dashboard-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
         <div className="wm-card text-center" style={{ maxWidth: 380 }}>
           <h5 className="fw-bold">You are signed out</h5>
-          <p className="text-muted small mb-3">Pick a portal on the home page to open a workspace.</p>
-          <button className="wm-btn wm-btn-primary" onClick={() => navigate('/')}>Go to sign in</button>
+          <p className="text-muted small mb-3">Sign in to open your workspace.</p>
+          <button className="wm-btn wm-btn-primary" onClick={() => navigate('/login')}>Go to sign in</button>
         </div>
       </div>
     );

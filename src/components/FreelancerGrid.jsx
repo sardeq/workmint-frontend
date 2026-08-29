@@ -10,7 +10,7 @@ const FREELANCERS = [
   { id: 4, name: 'Lina Haddad', role: 'Data & backend engineer', rating: 4.9, jobs: 34, rate: 50, skills: ['PostgreSQL', 'Express.js', 'AWS'] },
 ];
 
-const FreelancerGrid = ({ query = '', onEnter }) => {
+const FreelancerGrid = ({ query = '', onJoin }) => {
   const term = query.trim().toLowerCase();
 
   // Derived, not stored: the hero search filters this list directly.
@@ -72,7 +72,7 @@ const FreelancerGrid = ({ query = '', onEnter }) => {
                     type="button"
                     className="wm-btn wm-btn-outline"
                     style={{ width: '100%' }}
-                    onClick={() => onEnter('client')}
+                    onClick={() => onJoin('client')}
                   >
                     View profile
                   </button>

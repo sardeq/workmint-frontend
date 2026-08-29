@@ -6,16 +6,6 @@ import {
   buildSeed, uid, money, dayOffset, CLIENT_COMPANY,
 } from './freelancerData';
 
-/* =========================================================================
-   One store, both sides of the marketplace.
-
-   The client dashboard and the freelancer dashboard are separate routes, so
-   if each owned its own copy of the orders, approving a milestone as the
-   client would not release anything on the freelancer side. Holding the data
-   here means the two portals are genuinely the same contract seen from two
-   seats: approve as TechCorp, switch to the freelancer portal, and the money
-   has moved.
-   ========================================================================= */
 
 const USE_API = false; // flip to true once /api exists, see loadWorkspace()
 
@@ -33,6 +23,7 @@ export const WorkspaceProvider = ({ children }) => {
   const [portfolio, setPortfolio] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [disputes, setDisputes] = useState([]);
   const [profile, setProfile] = useState(null);
   const [clientProfile, setClientProfile] = useState(null);
   const [savedJobIds, setSavedJobIds] = useState([]);
@@ -65,6 +56,7 @@ export const WorkspaceProvider = ({ children }) => {
       setPortfolio(data.portfolio);
       setWithdrawals(data.withdrawals);
       setPaymentMethods(data.paymentMethods);
+      setDisputes(data.disputes);
       setProfile(data.profile);
       setClientProfile(data.clientProfile);
       setNotifications(
@@ -388,6 +380,106 @@ export const WorkspaceProvider = ({ children }) => {
     notify('Proposal declined', 'warn');
   };
 
+  /* ---------------- disputes ----------------
+     Either side can raise one while the money is still held. The milestone
+     freezes, and only an admin resolution moves it again. */
+  const raiseDispute = (orderId, milestoneId, raisedBy, form) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+    const milestone = order.milestones.find((m) => m.id === milestoneId);
+
+    const dispute = {
+      id: uid('DSP'),
+      orderId,
+      milestoneId,
+      project: order.project,
+      client: order.client,
+      freelancer: order.freelancer.name,
+      raisedBy,
+      amount: milestone.amount,
+      reason: form.reason,
+      detail: form.detail,
+      status: 'Open',
+      openedAt: new Date().toISOString(),
+    };
+
+    setDisputes((prev) => [dispute, ...prev]);
+
+    const who = raisedBy === 'client' ? order.client : order.freelancer.name;
+    const text = `${who} opened a dispute on "${milestone.title}"`;
+    updateOrder(orderId, (current) =>
+      withActivity(mapMilestone(current, milestoneId, { status: 'disputed' }), 'system', text)
+    );
+    pushNotification(orderId, raisedBy === 'client' ? 'freelancer' : 'client', text);
+    notify('Dispute opened. A mediator will review it.', 'warn');
+  };
+
+  const setDisputeStatus = (disputeId, status) => {
+    setDisputes((prev) => prev.map((d) => (d.id === disputeId ? { ...d, status } : d)));
+    notify(`Case marked as ${status.toLowerCase()}`);
+  };
+
+  /* Resolving a dispute is the only thing that can move disputed money. */
+  const resolveDispute = (disputeId, outcome, note) => {
+    const dispute = disputes.find((d) => d.id === disputeId);
+    if (!dispute) return;
+
+    setDisputes((prev) =>
+      prev.map((d) =>
+        d.id === disputeId
+          ? { ...d, status: 'Resolved', resolution: outcome, resolutionNote: note, resolvedAt: new Date().toISOString() }
+          : d
+      )
+    );
+
+    updateOrder(dispute.orderId, (order) => {
+      const milestone = order.milestones.find((m) => m.id === dispute.milestoneId);
+      if (!milestone) return order;
+
+      let milestones;
+      let text;
+
+      if (outcome === 'release') {
+        milestones = order.milestones.map((m) =>
+          m.id === milestone.id ? { ...m, status: 'approved', approvedOn: new Date().toISOString() } : m
+        );
+        text = `Mediator released ${money(milestone.amount)} to ${order.freelancer.name}`;
+      } else if (outcome === 'refund') {
+        milestones = order.milestones.map((m) =>
+          m.id === milestone.id ? { ...m, status: 'refunded', refundedOn: new Date().toISOString() } : m
+        );
+        text = `Mediator refunded ${money(milestone.amount)} to ${order.client}`;
+      } else {
+        // Split: half is paid out, half leaves escrow as a separate refund row
+        // so both ledgers still add up to the original amount.
+        const half = Math.round(milestone.amount / 2);
+        milestones = order.milestones.flatMap((m) =>
+          m.id === milestone.id
+            ? [
+                { ...m, amount: milestone.amount - half, status: 'approved', approvedOn: new Date().toISOString() },
+                {
+                  id: uid('MS'),
+                  title: `${milestone.title} (refunded half)`,
+                  amount: half,
+                  dueDate: m.dueDate,
+                  status: 'refunded',
+                  revisionsUsed: 0,
+                  refundedOn: new Date().toISOString(),
+                },
+              ]
+            : [m]
+        );
+        text = `Mediator split "${milestone.title}" evenly between both sides`;
+      }
+
+      return withActivity({ ...order, milestones }, 'system', text);
+    });
+
+    pushNotification(dispute.orderId, 'client', `Case ${dispute.id} was resolved`);
+    pushNotification(dispute.orderId, 'freelancer', `Case ${dispute.id} was resolved`);
+    notify(`${dispute.id} resolved`);
+  };
+
   const addPaymentMethod = (label, kind) => {
     setPaymentMethods((prev) => [...prev, { id: uid('PM'), label, kind, primary: false }]);
     notify('Payment method added');
@@ -400,16 +492,18 @@ export const WorkspaceProvider = ({ children }) => {
 
   const value = {
     loading, notify,
-    orders, jobs, proposals, talent, portfolio, withdrawals, paymentMethods,
+    orders, jobs, proposals, talent, portfolio, withdrawals, paymentMethods, disputes,
     profile, clientProfile, savedJobIds, notifications, markNotificationsRead,
     // shared
-    sendMessage, markThreadRead,
+    sendMessage, markThreadRead, raiseDispute,
     // freelancer
     startMilestone, submitDeliverable, requestScopeChange, applyToJob, withdrawProposal,
     toggleSaveJob, savePortfolioItem, deletePortfolioItem, saveProfile, requestWithdrawal,
     // client
     approveMilestone, requestRevision, decideScopeChange, postJob, closeJob,
     acceptProposal, declineProposal, addPaymentMethod, setPrimaryMethod,
+    // admin
+    resolveDispute, setDisputeStatus,
   };
 
   return (

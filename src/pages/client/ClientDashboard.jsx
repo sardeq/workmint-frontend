@@ -36,7 +36,7 @@ const ClientDashboard = () => {
   const {
     loading, orders: allOrders, jobs, proposals: allProposals, talent, paymentMethods,
     clientProfile, notifications, markNotificationsRead,
-    sendMessage, markThreadRead,
+    sendMessage, markThreadRead, raiseDispute,
     approveMilestone, requestRevision, decideScopeChange,
     postJob, closeJob, acceptProposal, declineProposal,
     addPaymentMethod, setPrimaryMethod, notify,
@@ -109,6 +109,7 @@ const ClientDashboard = () => {
             onDecideScope={decideScopeChange}
             onSend={sendMessage}
             onRead={markThreadRead}
+            onRaiseDispute={raiseDispute}
           />
         ) : (
           <ClientProjects orders={orders} onOpen={openProject} onGo={handleTabChange} />

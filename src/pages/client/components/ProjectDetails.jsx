@@ -2,22 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button, Form, Row, Col, Modal, Alert } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, EmptyState, Avatar } from '../../../components/Shared';
+import RaiseDisputeModal from '../../../components/RaiseDisputeModal';
 import {
   money, netOf, shortDate, timeAgo, deadlineLabel, deadlineTone,
   MILESTONE_STATUS, orderStatus, orderTotal, orderReleased, orderEscrow, orderProgress, unreadCount,
 } from '../../../data/freelancerData';
 
-const DOT_ICON = { approved: 'check', active: 'clock', submitted: 'upload', revision: 'revision', pending: 'lock' };
+const DOT_ICON = { approved: 'check', active: 'clock', submitted: 'upload', revision: 'revision', pending: 'lock', disputed: 'alert', refunded: 'back' };
 
 /* The client's side of the same contract the freelancer sees in
    ProjectWorkspace. Same rail, opposite buttons: they deliver, you decide. */
-const ProjectDetails = ({ order, onBack, onApprove, onRequestRevision, onDecideScope, onSend, onRead }) => {
+const ProjectDetails = ({ order, onBack, onApprove, onRequestRevision, onDecideScope, onSend, onRead, onRaiseDispute }) => {
   const [tab, setTab] = useState('milestones');
   const [message, setMessage] = useState('');
   const [revisionFor, setRevisionFor] = useState(null); // milestone id
   const [revisionNote, setRevisionNote] = useState('');
   const [revisionError, setRevisionError] = useState('');
   const [confirming, setConfirming] = useState(null); // milestone pending approval
+  const [showDispute, setShowDispute] = useState(false);
 
   const chatEndRef = useRef(null);
   const unread = unreadCount(order, 'client');
@@ -114,6 +116,20 @@ const ProjectDetails = ({ order, onBack, onApprove, onRequestRevision, onDecideS
             </div>
           )}
 
+          {milestone.status === 'disputed' && (
+            <div className="wm-note wm-note--danger">
+              <strong>Frozen pending mediation</strong>
+              {money(milestone.amount)} stays in escrow until a Workmint mediator decides the case.
+            </div>
+          )}
+
+          {milestone.status === 'refunded' && (
+            <div className="wm-note wm-note--muted">
+              <strong>Refunded to you</strong>
+              This milestone was returned after mediation. Nothing was paid out.
+            </div>
+          )}
+
           {milestone.status === 'active' && (
             <p className="text-muted mb-0 mt-3" style={{ fontSize: '0.85rem' }}>
               {order.freelancer.name} is working on this. You will be notified when it arrives.
@@ -205,9 +221,14 @@ const ProjectDetails = ({ order, onBack, onApprove, onRequestRevision, onDecideS
             <p className="text-muted mt-2 mb-0" style={{ fontSize: '0.87rem', maxWidth: 620 }}>{order.brief}</p>
           </div>
 
-          <Button variant="outline-secondary" size="sm" onClick={() => setTab('messages')}>
-            <Icon name="chat" size={14} className="me-1" /> Message {order.freelancer.name.split(' ')[0]}
-          </Button>
+          <div className="d-flex gap-2">
+            <Button variant="outline-secondary" size="sm" onClick={() => setTab('messages')}>
+              <Icon name="chat" size={14} className="me-1" /> Message {order.freelancer.name.split(' ')[0]}
+            </Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => setShowDispute(true)}>
+              Open a dispute
+            </Button>
+          </div>
         </div>
 
         <Row className="g-3 mt-1 pt-3 border-top">
@@ -341,6 +362,14 @@ const ProjectDetails = ({ order, onBack, onApprove, onRequestRevision, onDecideS
           </ul>
         </div>
       )}
+
+      <RaiseDisputeModal
+        show={showDispute}
+        onHide={() => setShowDispute(false)}
+        order={order}
+        role="client"
+        onSubmit={onRaiseDispute}
+      />
 
       {/* ---------- release confirmation ---------- */}
       <Modal show={Boolean(confirming)} onHide={() => setConfirming(null)} centered>
