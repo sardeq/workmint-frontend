@@ -1,530 +1,474 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Toast, ToastContainer } from 'react-bootstrap';
-import axios from 'axios';
 
+import { useAuth } from './AuthContext';
+import { buildSeed, uid, money } from './freelancerData';
 import {
-  buildSeed, uid, money, dayOffset, CLIENT_COMPANY,
-} from './freelancerData';
+    ordersApi, jobsApi, proposalsApi, milestonesApi, messagesApi, disputesApi, usersApi,
+} from '../api/api';
+import {
+    toOrder, toJob, toProposal, toDispute, toTalent, toProfile, errorText,
+} from '../api/adapters';
 
-
-const USE_API = false; // flip to true once /api exists, see loadWorkspace()
 
 export const WorkspaceContext = createContext();
 export const useWorkspace = () => useContext(WorkspaceContext);
 
 export const WorkspaceProvider = ({ children }) => {
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
+    const { currentUser, updateCurrentUser } = useAuth();
 
-  const [orders, setOrders] = useState([]);
-  const [jobs, setJobs] = useState([]);
-  const [proposals, setProposals] = useState([]);
-  const [talent, setTalent] = useState([]);
-  const [portfolio, setPortfolio] = useState([]);
-  const [withdrawals, setWithdrawals] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [disputes, setDisputes] = useState([]);
-  const [profile, setProfile] = useState(null);
-  const [clientProfile, setClientProfile] = useState(null);
-  const [savedJobIds, setSavedJobIds] = useState([]);
-  const [notifications, setNotifications] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [toast, setToast] = useState(null);
 
-  /* ---------------- load ---------------- */
-  useEffect(() => {
-    let cancelled = false;
+    const [orders, setOrders] = useState([]);
+    const [jobs, setJobs] = useState([]);
+    const [proposals, setProposals] = useState([]);
+    const [disputes, setDisputes] = useState([]);
+    const [talent, setTalent] = useState([]);
+    const [profile, setProfile] = useState(null);
+    const [notifications, setNotifications] = useState([]);
+    const [savedJobIds, setSavedJobIds] = useState([]);
+
+    /* ---- not on the server yet, so these stay local ----
+       Portfolio and payment methods keep their seed rows because they are
+       only cosmetic. Withdrawals start EMPTY: the seed had a $1,440 payout
+       against seed earnings, and paired with real earnings from the database
+       that produced a negative available balance. */
+    const seed = buildSeed();
+    const [portfolio, setPortfolio] = useState(seed.portfolio);
+    const [withdrawals, setWithdrawals] = useState([]);
+    const [paymentMethods, setPaymentMethods] = useState(seed.paymentMethods);
+
+    const notify = (text, tone = 'success') => setToast({ id: uid('T'), text, tone });
+
+    /* ---------------- loading ---------------- */
+
+    // Which slice of the marketplace this account can see.
+    const scope = () => {
+        if (!currentUser) return {};
+        if (currentUser.role === 'client') return { client_id: currentUser.id };
+        if (currentUser.role === 'freelancer') return { freelancer_id: currentUser.id };
+        return {}; // admin sees everything
+    };
 
     const loadWorkspace = async () => {
-      let data = buildSeed();
-
-      if (USE_API) {
+        if (!currentUser) return;
+        setLoading(true);
         try {
-          const res = await axios.get('/api/workspace');
-          data = res.data;
+            const params = scope();
+            const [orderRows, jobRows, proposalRows, disputeRows] = await Promise.all([
+                ordersApi.getAll(params),
+                jobsApi.getAll(),
+                proposalsApi.getAll(params),
+                disputesApi.getAll(),
+            ]);
+
+            // The list endpoint returns no milestones or messages, and every
+            // screen needs them, so pull each order in full.
+            const full = await Promise.all(orderRows.map((row) => ordersApi.getOne(row.id)));
+
+            setOrders(full.map(toOrder));
+            setJobs(jobRows.map(toJob));
+            setProposals(proposalRows.map(toProposal));
+            setDisputes(disputeRows.map(toDispute));
+
+            if (currentUser.role === 'client') {
+                const people = await usersApi.getAll({ role: 'freelancer', status: 'active' });
+                setTalent(people.map(toTalent));
+            }
+            if (currentUser.role === 'freelancer') {
+                const me = await usersApi.getOne(currentUser.id);
+                setProfile(toProfile(me));
+            }
         } catch (err) {
-          console.warn('Workspace API unavailable, using seed data:', err.message);
+            notify(errorText(err, 'Could not load your workspace.'), 'warn');
+        } finally {
+            setLoading(false);
         }
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 350));
-      }
-
-      if (cancelled) return;
-
-      setOrders(data.orders);
-      setJobs(data.jobs);
-      setProposals(data.proposals);
-      setTalent(data.talent);
-      setPortfolio(data.portfolio);
-      setWithdrawals(data.withdrawals);
-      setPaymentMethods(data.paymentMethods);
-      setDisputes(data.disputes);
-      setProfile(data.profile);
-      setClientProfile(data.clientProfile);
-      setNotifications(
-        data.orders
-          .flatMap((order) =>
-            order.activity.map((a) => ({
-              id: `N-${a.id}`,
-              at: a.at,
-              text: a.text,
-              orderId: order.id,
-              // a notification is for whoever did NOT cause it
-              audience: a.actor === 'client' ? 'freelancer' : 'client',
-              read: false,
-            }))
-          )
-          .sort((a, b) => new Date(b.at) - new Date(a.at))
-          .slice(0, 12)
-      );
-      setLoading(false);
     };
 
-    loadWorkspace();
-    return () => { cancelled = true; };
-  }, []);
+    useEffect(() => {
+        if (currentUser) {
+            loadWorkspace();
+        } else {
+            setOrders([]); setJobs([]); setProposals([]); setDisputes([]);
+            setTalent([]); setProfile(null); setLoading(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser]);
 
-  /* ---------------- helpers ---------------- */
-  const notify = (text, tone = 'success') => setToast({ id: uid('T'), text, tone });
-
-  const updateOrder = (orderId, updater) =>
-    setOrders((prev) => prev.map((o) => (o.id === orderId ? updater(o) : o)));
-
-  const withActivity = (order, actor, text) => ({
-    ...order,
-    activity: [{ id: uid('A'), at: new Date().toISOString(), actor, text }, ...order.activity],
-  });
-
-  const pushNotification = (orderId, audience, text) =>
-    setNotifications((prev) => [
-      { id: uid('N'), at: new Date().toISOString(), text, orderId, audience, read: false },
-      ...prev,
-    ]);
-
-  const mapMilestone = (order, milestoneId, patch) => ({
-    ...order,
-    milestones: order.milestones.map((m) => (m.id === milestoneId ? { ...m, ...patch } : m)),
-  });
-
-  const markNotificationsRead = (audience) =>
-    setNotifications((prev) => prev.map((n) => (n.audience === audience ? { ...n, read: true } : n)));
-
-  /* ---------------- shared: messaging ---------------- */
-  const sendMessage = (orderId, from, text) =>
-    updateOrder(orderId, (order) => ({
-      ...order,
-      messages: [...order.messages, { id: uid('M'), from, text, at: new Date().toISOString(), read: false }],
-    }));
-
-  const markThreadRead = (orderId, role) =>
-    updateOrder(orderId, (order) => ({
-      ...order,
-      messages: order.messages.map((m) => (m.from === role ? m : { ...m, read: true })),
-    }));
-
-  /* ---------------- freelancer actions ---------------- */
-  const startMilestone = (orderId, milestoneId) =>
-    updateOrder(orderId, (order) => {
-      const ms = order.milestones.find((m) => m.id === milestoneId);
-      notify(`Started "${ms.title}"`);
-      return withActivity(
-        mapMilestone(order, milestoneId, { status: 'active' }),
-        'freelancer',
-        `${order.freelancer.name} started "${ms.title}"`
-      );
-    });
-
-  const submitDeliverable = (orderId, milestoneId, payload) =>
-    updateOrder(orderId, (order) => {
-      const ms = order.milestones.find((m) => m.id === milestoneId);
-      const text = `${order.freelancer.name} delivered "${ms.title}"`;
-      pushNotification(orderId, 'client', text);
-      notify(`Delivered "${ms.title}". ${order.client} has been notified.`);
-      return withActivity(
-        mapMilestone(order, milestoneId, {
-          status: 'submitted',
-          deliverable: { ...payload, at: new Date().toISOString() },
-        }),
-        'freelancer',
-        text
-      );
-    });
-
-  const requestScopeChange = (orderId, form) =>
-    updateOrder(orderId, (order) => {
-      const request = {
-        id: uid('CR'),
-        reason: form.reason,
-        extraCost: Number(form.extraCost) || 0,
-        extraDays: Number(form.extraDays) || 0,
-        status: 'Pending',
-        at: new Date().toISOString(),
-      };
-      const text = `${order.freelancer.name} requested a scope change`;
-      pushNotification(orderId, 'client', text);
-      notify('Scope change sent for client approval');
-      return withActivity(
-        { ...order, changeRequests: [request, ...order.changeRequests] },
-        'freelancer',
-        text
-      );
-    });
-
-  const applyToJob = (job, form) => {
-    setProposals((prev) => [
-      {
-        id: uid('PROP'),
-        jobId: job.id,
-        job: job.title,
-        client: job.client,
-        freelancer: profile ? { name: profile.name, title: profile.title, rating: 4.9, jobs: 38 } : null,
-        amount: Number(form.amount),
-        days: Number(form.days),
-        cover: form.cover,
-        plan: form.plan,
-        status: 'Pending',
-        sentAt: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    notify(`Proposal sent to ${job.client}`);
-  };
-
-  const withdrawProposal = (id) => {
-    setProposals((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'Withdrawn' } : p)));
-    notify('Proposal withdrawn', 'warn');
-  };
-
-  const toggleSaveJob = (id) =>
-    setSavedJobIds((prev) => (prev.includes(id) ? prev.filter((j) => j !== id) : [...prev, id]));
-
-  const savePortfolioItem = (item) => {
-    setPortfolio((prev) =>
-      item.id ? prev.map((p) => (p.id === item.id ? item : p)) : [...prev, { ...item, id: uid('PF') }]
-    );
-    notify(item.id ? 'Project updated' : 'Project added to your portfolio');
-  };
-
-  const deletePortfolioItem = (id) => {
-    setPortfolio((prev) => prev.filter((p) => p.id !== id));
-    notify('Project removed', 'warn');
-  };
-
-  const saveProfile = (next) => {
-    setProfile(next);
-    notify('Profile saved');
-  };
-
-  const requestWithdrawal = (amount, method) => {
-    setWithdrawals((prev) => [
-      { id: uid('WD'), amount, method, at: new Date().toISOString(), status: 'Processing' },
-      ...prev,
-    ]);
-    notify(`${money(amount)} on the way to your ${method.toLowerCase()}`);
-  };
-
-  /* ---------------- client actions ---------------- */
-  const approveMilestone = (orderId, milestoneId) =>
-    updateOrder(orderId, (order) => {
-      const ms = order.milestones.find((m) => m.id === milestoneId);
-      const text = `${order.client} approved "${ms.title}" - ${money(ms.amount)} released`;
-      pushNotification(orderId, 'freelancer', text);
-      notify(text);
-      return withActivity(
-        mapMilestone(order, milestoneId, { status: 'approved', approvedOn: new Date().toISOString() }),
-        'client',
-        text
-      );
-    });
-
-  const requestRevision = (orderId, milestoneId, note) =>
-    updateOrder(orderId, (order) => {
-      const ms = order.milestones.find((m) => m.id === milestoneId);
-      const text = `${order.client} requested a revision on "${ms.title}"`;
-      pushNotification(orderId, 'freelancer', text);
-      notify('Sent back with your notes', 'warn');
-      return withActivity(
-        mapMilestone(order, milestoneId, {
-          status: 'revision',
-          revisionsUsed: ms.revisionsUsed + 1,
-          revisionNote: note,
-        }),
-        'client',
-        text
-      );
-    });
-
-  const decideScopeChange = (orderId, requestId, decision) =>
-    updateOrder(orderId, (order) => {
-      const request = order.changeRequests.find((cr) => cr.id === requestId);
-      const approved = decision === 'Approved';
-
-      // Approving adds the extra work as a new funded milestone.
-      const extraMilestone = approved && request.extraCost > 0
-        ? [{
-            id: uid('MS'),
-            title: 'Scope change: additional work',
-            amount: request.extraCost,
-            dueDate: dayOffset(request.extraDays || 7),
-            status: 'pending',
-            revisionsUsed: 0,
-          }]
-        : [];
-
-      const text = `${order.client} ${approved ? 'approved' : 'declined'} the scope change`;
-      pushNotification(orderId, 'freelancer', text);
-      notify(approved ? `Scope change approved, ${money(request.extraCost)} added to escrow` : 'Scope change declined', approved ? 'success' : 'warn');
-
-      return withActivity(
-        {
-          ...order,
-          milestones: [...order.milestones, ...extraMilestone],
-          changeRequests: order.changeRequests.map((cr) =>
-            cr.id === requestId ? { ...cr, status: decision } : cr
-          ),
-        },
-        'client',
-        text
-      );
-    });
-
-  const postJob = (form) => {
-    const job = {
-      id: uid('JOB'),
-      postedBy: CLIENT_COMPANY,
-      client: CLIENT_COMPANY,
-      clientRating: 4.9,
-      clientJobs: 14,
-      title: form.title,
-      description: form.description,
-      budget: Number(form.budget),
-      days: Number(form.days),
-      level: form.level,
-      skills: form.skills,
-      postedHours: 0,
-      proposals: 0,
-    };
-    setJobs((prev) => [job, ...prev]);
-    notify('Job posted. Freelancers can see it now.');
-    return job;
-  };
-
-  const closeJob = (jobId) => {
-    setJobs((prev) => prev.filter((j) => j.id !== jobId));
-    setProposals((prev) =>
-      prev.map((p) => (p.jobId === jobId && p.status === 'Pending' ? { ...p, status: 'Declined' } : p))
-    );
-    notify('Job closed and open proposals declined', 'warn');
-  };
-
-  /* Accepting a proposal is what turns a job into a funded contract. */
-  const acceptProposal = (proposalId) => {
-    const proposal = proposals.find((p) => p.id === proposalId);
-    if (!proposal) return null;
-
-    const job = jobs.find((j) => j.id === proposal.jobId);
-    const plan = proposal.plan && proposal.plan.length
-      ? proposal.plan
-      : [{ title: 'Full delivery', amount: proposal.amount }];
-
-    const newOrder = {
-      id: uid('ORD'),
-      client: CLIENT_COMPANY,
-      clientContact: clientProfile ? clientProfile.contact : 'Client',
-      freelancer: proposal.freelancer,
-      project: job ? job.title : proposal.job,
-      brief: job ? job.description : '',
-      startedOn: dayOffset(0),
-      deadline: dayOffset(proposal.days),
-      revisionsIncluded: 2,
-      milestones: plan.map((row, index) => ({
-        id: uid('MS'),
-        title: row.title || `Milestone ${index + 1}`,
-        amount: Number(row.amount),
-        dueDate: dayOffset(Math.round((proposal.days * (index + 1)) / plan.length)),
-        status: index === 0 ? 'active' : 'pending',
-        revisionsUsed: 0,
-      })),
-      messages: [{
-        id: uid('M'),
-        from: 'client',
-        text: `We have accepted your proposal and funded ${money(proposal.amount)} into escrow. Start whenever you are ready.`,
-        at: new Date().toISOString(),
-        read: false,
-      }],
-      activity: [{
-        id: uid('A'),
-        at: new Date().toISOString(),
-        actor: 'system',
-        text: `${CLIENT_COMPANY} funded ${money(proposal.amount)} into escrow`,
-      }],
-      changeRequests: [],
-    };
-
-    setOrders((prev) => [newOrder, ...prev]);
-    setProposals((prev) =>
-      prev.map((p) => {
-        if (p.id === proposalId) return { ...p, status: 'Accepted' };
-        // one job, one hire: everything else on that job is declined
-        if (p.jobId === proposal.jobId && p.status === 'Pending') return { ...p, status: 'Declined' };
-        return p;
-      })
-    );
-    if (job) setJobs((prev) => prev.filter((j) => j.id !== job.id));
-
-    pushNotification(newOrder.id, 'freelancer', `${CLIENT_COMPANY} accepted your proposal for ${newOrder.project}`);
-    notify(`Hired ${proposal.freelancer.name}. ${money(proposal.amount)} is now in escrow.`);
-    return newOrder;
-  };
-
-  const declineProposal = (proposalId) => {
-    setProposals((prev) => prev.map((p) => (p.id === proposalId ? { ...p, status: 'Declined' } : p)));
-    notify('Proposal declined', 'warn');
-  };
-
-  /* ---------------- disputes ----------------
-     Either side can raise one while the money is still held. The milestone
-     freezes, and only an admin resolution moves it again. */
-  const raiseDispute = (orderId, milestoneId, raisedBy, form) => {
-    const order = orders.find((o) => o.id === orderId);
-    if (!order) return;
-    const milestone = order.milestones.find((m) => m.id === milestoneId);
-
-    const dispute = {
-      id: uid('DSP'),
-      orderId,
-      milestoneId,
-      project: order.project,
-      client: order.client,
-      freelancer: order.freelancer.name,
-      raisedBy,
-      amount: milestone.amount,
-      reason: form.reason,
-      detail: form.detail,
-      status: 'Open',
-      openedAt: new Date().toISOString(),
-    };
-
-    setDisputes((prev) => [dispute, ...prev]);
-
-    const who = raisedBy === 'client' ? order.client : order.freelancer.name;
-    const text = `${who} opened a dispute on "${milestone.title}"`;
-    updateOrder(orderId, (current) =>
-      withActivity(mapMilestone(current, milestoneId, { status: 'disputed' }), 'system', text)
-    );
-    pushNotification(orderId, raisedBy === 'client' ? 'freelancer' : 'client', text);
-    notify('Dispute opened. A mediator will review it.', 'warn');
-  };
-
-  const setDisputeStatus = (disputeId, status) => {
-    setDisputes((prev) => prev.map((d) => (d.id === disputeId ? { ...d, status } : d)));
-    notify(`Case marked as ${status.toLowerCase()}`);
-  };
-
-  /* Resolving a dispute is the only thing that can move disputed money. */
-  const resolveDispute = (disputeId, outcome, note) => {
-    const dispute = disputes.find((d) => d.id === disputeId);
-    if (!dispute) return;
-
-    setDisputes((prev) =>
-      prev.map((d) =>
-        d.id === disputeId
-          ? { ...d, status: 'Resolved', resolution: outcome, resolutionNote: note, resolvedAt: new Date().toISOString() }
-          : d
-      )
-    );
-
-    updateOrder(dispute.orderId, (order) => {
-      const milestone = order.milestones.find((m) => m.id === dispute.milestoneId);
-      if (!milestone) return order;
-
-      let milestones;
-      let text;
-
-      if (outcome === 'release') {
-        milestones = order.milestones.map((m) =>
-          m.id === milestone.id ? { ...m, status: 'approved', approvedOn: new Date().toISOString() } : m
+    /* Notifications are derived from order activity rather than stored, so
+       there is no extra table or endpoint to keep in step. */
+    useEffect(() => {
+        const audienceOf = (actor) => (actor === 'client' ? 'freelancer' : 'client');
+        setNotifications(
+            orders
+                .flatMap((order) =>
+                    order.activity.map((a) => ({
+                        id: `N-${order.id}-${a.id}`,
+                        at: a.at,
+                        text: a.text,
+                        orderId: order.id,
+                        audience: audienceOf(a.actor),
+                        read: false,
+                    }))
+                )
+                .sort((a, b) => new Date(b.at) - new Date(a.at))
+                .slice(0, 12)
         );
-        text = `Mediator released ${money(milestone.amount)} to ${order.freelancer.name}`;
-      } else if (outcome === 'refund') {
-        milestones = order.milestones.map((m) =>
-          m.id === milestone.id ? { ...m, status: 'refunded', refundedOn: new Date().toISOString() } : m
+    }, [orders]);
+
+    const markNotificationsRead = (audience) =>
+        setNotifications((prev) => prev.map((n) => (n.audience === audience ? { ...n, read: true } : n)));
+
+    /* After any write, read the order back so the UI matches the database. */
+    const refreshOrder = async (orderId) => {
+        const fresh = await ordersApi.getOne(orderId);
+        const mapped = toOrder(fresh);
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? mapped : o)));
+        return mapped;
+    };
+
+    const refreshProposals = async () => {
+        const rows = await proposalsApi.getAll(scope());
+        setProposals(rows.map(toProposal));
+    };
+
+    const refreshJobs = async () => {
+        const rows = await jobsApi.getAll();
+        setJobs(rows.map(toJob));
+    };
+
+    const refreshDisputes = async () => {
+        const rows = await disputesApi.getAll();
+        setDisputes(rows.map(toDispute));
+    };
+
+    /* ---------------- messaging ---------------- */
+
+    const sendMessage = async (orderId, from, text) => {
+        try {
+            await messagesApi.send(orderId, from, text);
+            await refreshOrder(orderId);
+        } catch (err) {
+            notify(errorText(err, 'Message not sent.'), 'warn');
+        }
+    };
+
+    const markThreadRead = async (orderId, role) => {
+        try {
+            await messagesApi.markRead(orderId, role);
+            await refreshOrder(orderId);
+        } catch (err) {
+            // Not worth a toast: the badge is just briefly wrong.
+            console.error(errorText(err));
+        }
+    };
+
+    /* ---------------- freelancer ---------------- */
+
+    const startMilestone = async (orderId, milestoneId) => {
+        try {
+            const m = await milestonesApi.start(milestoneId);
+            await refreshOrder(orderId);
+            notify(`Started "${m.title}"`);
+        } catch (err) {
+            notify(errorText(err, 'Could not start that milestone.'), 'warn');
+        }
+    };
+
+    const submitDeliverable = async (orderId, milestoneId, payload) => {
+        try {
+            const m = await milestonesApi.deliver(milestoneId, payload.link, payload.note);
+            const order = await refreshOrder(orderId);
+            notify(`Delivered "${m.title}". ${order.client} has been notified.`);
+        } catch (err) {
+            notify(errorText(err, 'Could not deliver that milestone.'), 'warn');
+        }
+    };
+
+    const requestScopeChange = async (orderId, form) => {
+        try {
+            await ordersApi.requestScopeChange(orderId, {
+                reason: form.reason,
+                extra_cost: Number(form.extraCost) || 0,
+                extra_days: Number(form.extraDays) || 0,
+            });
+            await refreshOrder(orderId);
+            notify('Scope change sent for client approval');
+        } catch (err) {
+            notify(errorText(err, 'Could not send that request.'), 'warn');
+        }
+    };
+
+    const applyToJob = async (job, form) => {
+        try {
+            await proposalsApi.create({
+                job_id: job.id,
+                freelancer_id: currentUser.id,
+                amount: Number(form.amount),
+                days: Number(form.days),
+                cover: form.cover,
+            });
+            await refreshProposals();
+            notify(`Proposal sent to ${job.client}`);
+        } catch (err) {
+            notify(errorText(err, 'Could not send that proposal.'), 'warn');
+        }
+    };
+
+    const withdrawProposal = async (id) => {
+        try {
+            await proposalsApi.setStatus(id, 'Withdrawn');
+            await refreshProposals();
+            notify('Proposal withdrawn', 'warn');
+        } catch (err) {
+            notify(errorText(err), 'warn');
+        }
+    };
+
+    const toggleSaveJob = (id) =>
+        setSavedJobIds((prev) => (prev.includes(id) ? prev.filter((j) => j !== id) : [...prev, id]));
+
+    const saveProfile = async (next) => {
+        try {
+            await usersApi.update(currentUser.id, {
+                name: next.name,
+                title: next.title,
+                bio: next.bio,
+                skills: next.skills,
+                hourly_rate: next.rate,
+                available: next.available,
+                location: next.location,
+                company: null,
+            });
+            setProfile(next);
+            updateCurrentUser({ name: next.name, title: next.title });
+            notify('Profile saved');
+        } catch (err) {
+            notify(errorText(err, 'Could not save your profile.'), 'warn');
+        }
+    };
+
+    /* ---------------- client ---------------- */
+
+    const approveMilestone = async (orderId, milestoneId) => {
+        try {
+            const m = await milestonesApi.approve(milestoneId);
+            await refreshOrder(orderId);
+            notify(`Approved "${m.title}" - ${money(Number(m.amount))} released`);
+        } catch (err) {
+            notify(errorText(err, 'Could not approve that milestone.'), 'warn');
+        }
+    };
+
+    const requestRevision = async (orderId, milestoneId, note) => {
+        try {
+            await milestonesApi.requestRevision(milestoneId, note);
+            await refreshOrder(orderId);
+            notify('Sent back with your notes', 'warn');
+        } catch (err) {
+            notify(errorText(err, 'Could not send that back.'), 'warn');
+        }
+    };
+
+    const decideScopeChange = async (orderId, requestId, decision) => {
+        try {
+            const request = await ordersApi.decideScopeChange(orderId, requestId, decision);
+            await refreshOrder(orderId);
+            notify(
+                decision === 'Approved'
+                    ? `Scope change approved, ${money(Number(request.extra_cost))} added to escrow`
+                    : 'Scope change declined',
+                decision === 'Approved' ? 'success' : 'warn'
+            );
+        } catch (err) {
+            notify(errorText(err), 'warn');
+        }
+    };
+
+    const postJob = async (form) => {
+        try {
+            const job = await jobsApi.create({
+                client_id: currentUser.id,
+                title: form.title,
+                description: form.description,
+                budget: Number(form.budget),
+                days: Number(form.days),
+                level: form.level,
+                skills: form.skills,
+            });
+            await refreshJobs();
+            notify('Job posted. Freelancers can see it now.');
+            return job;
+        } catch (err) {
+            notify(errorText(err, 'Could not post that job.'), 'warn');
+            return null;
+        }
+    };
+
+    const closeJob = async (jobId) => {
+        try {
+            await jobsApi.close(jobId);
+            await refreshJobs();
+            await refreshProposals();
+            notify('Job closed and open proposals declined', 'warn');
+        } catch (err) {
+            notify(errorText(err), 'warn');
+        }
+    };
+
+    /* Hiring creates the contract server-side, so reload rather than trying
+       to guess what the new order looks like. */
+    const acceptProposal = async (proposalId) => {
+        try {
+            const proposal = proposals.find((p) => p.id === proposalId);
+            const row = await proposalsApi.accept(proposalId);
+            await Promise.all([refreshProposals(), refreshJobs()]);
+
+            const created = toOrder(await ordersApi.getOne(row.id));
+            setOrders((prev) => [created, ...prev]);
+
+            notify(
+                proposal
+                    ? `Hired ${proposal.freelancer.name}. ${money(proposal.amount)} is now in escrow.`
+                    : 'Freelancer hired.'
+            );
+            return created;
+        } catch (err) {
+            notify(errorText(err, 'Could not accept that proposal.'), 'warn');
+            return null;
+        }
+    };
+
+    const declineProposal = async (proposalId) => {
+        try {
+            await proposalsApi.setStatus(proposalId, 'Declined');
+            await refreshProposals();
+            notify('Proposal declined', 'warn');
+        } catch (err) {
+            notify(errorText(err), 'warn');
+        }
+    };
+
+    /* ---------------- disputes ---------------- */
+
+    const raiseDispute = async (orderId, milestoneId, raisedBy, form) => {
+        try {
+            await disputesApi.create({
+                order_id: orderId,
+                milestone_id: milestoneId,
+                raised_by: raisedBy,
+                reason: form.reason,
+                detail: form.detail,
+            });
+            await Promise.all([refreshOrder(orderId), refreshDisputes()]);
+            notify('Dispute opened. A mediator will review it.', 'warn');
+        } catch (err) {
+            notify(errorText(err, 'Could not open that dispute.'), 'warn');
+        }
+    };
+
+    const setDisputeStatus = async (disputeId, status) => {
+        try {
+            await disputesApi.claim(disputeId);
+            await refreshDisputes();
+            notify(`Case marked as ${status.toLowerCase()}`);
+        } catch (err) {
+            notify(errorText(err), 'warn');
+        }
+    };
+
+    const resolveDispute = async (disputeId, outcome, note) => {
+        try {
+            const dispute = disputes.find((d) => d.id === disputeId);
+            await disputesApi.resolve(disputeId, outcome, note);
+            await refreshDisputes();
+            if (dispute) await refreshOrder(dispute.orderId);
+            notify(`${dispute ? `Case ${dispute.id}` : 'Case'} resolved`);
+        } catch (err) {
+            notify(errorText(err, 'Could not resolve that case.'), 'warn');
+        }
+    };
+
+    /* ------------- still local: no tables for these yet ------------- */
+
+    const savePortfolioItem = (item) => {
+        setPortfolio((prev) =>
+            item.id ? prev.map((p) => (p.id === item.id ? item : p)) : [...prev, { ...item, id: uid('PF') }]
         );
-        text = `Mediator refunded ${money(milestone.amount)} to ${order.client}`;
-      } else {
-        // Split: half is paid out, half leaves escrow as a separate refund row
-        // so both ledgers still add up to the original amount.
-        const half = Math.round(milestone.amount / 2);
-        milestones = order.milestones.flatMap((m) =>
-          m.id === milestone.id
-            ? [
-                { ...m, amount: milestone.amount - half, status: 'approved', approvedOn: new Date().toISOString() },
-                {
-                  id: uid('MS'),
-                  title: `${milestone.title} (refunded half)`,
-                  amount: half,
-                  dueDate: m.dueDate,
-                  status: 'refunded',
-                  revisionsUsed: 0,
-                  refundedOn: new Date().toISOString(),
-                },
-              ]
-            : [m]
-        );
-        text = `Mediator split "${milestone.title}" evenly between both sides`;
-      }
+        notify(item.id ? 'Project updated' : 'Project added to your portfolio');
+    };
 
-      return withActivity({ ...order, milestones }, 'system', text);
-    });
+    const deletePortfolioItem = (id) => {
+        setPortfolio((prev) => prev.filter((p) => p.id !== id));
+        notify('Project removed', 'warn');
+    };
 
-    pushNotification(dispute.orderId, 'client', `Case ${dispute.id} was resolved`);
-    pushNotification(dispute.orderId, 'freelancer', `Case ${dispute.id} was resolved`);
-    notify(`${dispute.id} resolved`);
-  };
+    const requestWithdrawal = (amount, method) => {
+        setWithdrawals((prev) => [
+            { id: uid('WD'), amount, method, at: new Date().toISOString(), status: 'Processing' },
+            ...prev,
+        ]);
+        notify(`${money(amount)} on the way to your ${method.toLowerCase()}`);
+    };
 
-  const addPaymentMethod = (label, kind) => {
-    setPaymentMethods((prev) => [...prev, { id: uid('PM'), label, kind, primary: false }]);
-    notify('Payment method added');
-  };
+    const addPaymentMethod = (label, kind) => {
+        setPaymentMethods((prev) => [...prev, { id: uid('PM'), label, kind, primary: false }]);
+        notify('Payment method added');
+    };
 
-  const setPrimaryMethod = (id) => {
-    setPaymentMethods((prev) => prev.map((m) => ({ ...m, primary: m.id === id })));
-    notify('Primary payment method updated');
-  };
+    const setPrimaryMethod = (id) => {
+        setPaymentMethods((prev) => prev.map((m) => ({ ...m, primary: m.id === id })));
+        notify('Primary payment method updated');
+    };
 
-  const value = {
-    loading, notify,
-    orders, jobs, proposals, talent, portfolio, withdrawals, paymentMethods, disputes,
-    profile, clientProfile, savedJobIds, notifications, markNotificationsRead,
-    // shared
-    sendMessage, markThreadRead, raiseDispute,
-    // freelancer
-    startMilestone, submitDeliverable, requestScopeChange, applyToJob, withdrawProposal,
-    toggleSaveJob, savePortfolioItem, deletePortfolioItem, saveProfile, requestWithdrawal,
-    // client
-    approveMilestone, requestRevision, decideScopeChange, postJob, closeJob,
-    acceptProposal, declineProposal, addPaymentMethod, setPrimaryMethod,
-    // admin
-    resolveDispute, setDisputeStatus,
-  };
+    /* The client's own details, read straight off the signed-in account. */
+    const clientProfile = currentUser && currentUser.role === 'client'
+        ? {
+            company: currentUser.company,
+            contact: currentUser.name,
+            role: currentUser.title,
+            location: currentUser.location,
+            since: currentUser.joinedAt,
+        }
+        : null;
 
-  return (
-    <WorkspaceContext.Provider value={value}>
-      {children}
+    const value = {
+        loading, notify, reload: loadWorkspace,
+        orders, jobs, proposals, talent, portfolio, withdrawals, paymentMethods, disputes,
+        profile, clientProfile, savedJobIds, notifications, markNotificationsRead,
+        // shared
+        sendMessage, markThreadRead, raiseDispute,
+        // freelancer
+        startMilestone, submitDeliverable, requestScopeChange, applyToJob, withdrawProposal,
+        toggleSaveJob, savePortfolioItem, deletePortfolioItem, saveProfile, requestWithdrawal,
+        // client
+        approveMilestone, requestRevision, decideScopeChange, postJob, closeJob,
+        acceptProposal, declineProposal, addPaymentMethod, setPrimaryMethod,
+        // admin
+        resolveDispute, setDisputeStatus,
+    };
 
-      <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 1080 }}>
-        {toast && (
-          <Toast key={toast.id} onClose={() => setToast(null)} show autohide delay={3200}>
-            <Toast.Body className="d-flex align-items-center gap-2" style={{ fontSize: '0.88rem' }}>
-              <span
-                style={{
-                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  background: toast.tone === 'warn' ? 'var(--amber)' : 'var(--mint-primary)',
-                }}
-              />
-              {toast.text}
-            </Toast.Body>
-          </Toast>
-        )}
-      </ToastContainer>
-    </WorkspaceContext.Provider>
-  );
+    return (
+        <WorkspaceContext.Provider value={value}>
+            {children}
+
+            <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 1080 }}>
+                {toast && (
+                    <Toast key={toast.id} onClose={() => setToast(null)} show autohide delay={3200}>
+                        <Toast.Body className="d-flex align-items-center gap-2" style={{ fontSize: '0.88rem' }}>
+                            <span
+                                style={{
+                                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                                    background: toast.tone === 'warn' ? 'var(--amber)' : 'var(--mint-primary)',
+                                }}
+                            />
+                            {toast.text}
+                        </Toast.Body>
+                    </Toast>
+                )}
+            </ToastContainer>
+        </WorkspaceContext.Provider>
+    );
 };

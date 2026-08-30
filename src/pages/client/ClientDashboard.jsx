@@ -71,8 +71,8 @@ const ClientDashboard = () => {
   const [pageTitle, pageSub] = PAGE_COPY[activeTab] || PAGE_COPY.Overview;
   const firstName = currentUser ? currentUser.name.split(' ')[0] : 'there';
 
-  const handleHire = (proposalId) => {
-    const order = acceptProposal(proposalId);
+  const handleHire = async (proposalId) => {
+    const order = await acceptProposal(proposalId);
     if (order) openProject(order.id);
   };
 
@@ -130,7 +130,10 @@ const ClientDashboard = () => {
       case 'Post a Job':
         return (
           <PostJobForm
-            onPostJob={(form) => { postJob(form); handleTabChange('Proposals'); }}
+            onPostJob={async (form) => {
+              const job = await postJob(form);
+              if (job) handleTabChange('Proposals');
+            }}
           />
         );
 
@@ -173,7 +176,7 @@ const ClientDashboard = () => {
   return (
     <Layout
       title={selectedOrder ? selectedOrder.project : activeTab === 'Overview' ? `Welcome back, ${firstName}` : pageTitle}
-      subtitle={selectedOrder ? `${selectedOrder.id} with ${selectedOrder.freelancer.name}` : pageSub}
+      subtitle={selectedOrder ? `${selectedOrder.ref} with ${selectedOrder.freelancer.name}` : pageSub}
       activeTab={activeTab}
       setActiveTab={handleTabChange}
       badges={badges}

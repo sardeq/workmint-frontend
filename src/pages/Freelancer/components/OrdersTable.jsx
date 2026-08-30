@@ -30,7 +30,7 @@ const OrdersTable = ({ orders, onOpen }) => {
     .filter(matchesFilter)
     .filter((o) => {
       const q = search.toLowerCase();
-      return o.project.toLowerCase().includes(q) || o.client.toLowerCase().includes(q) || o.id.toLowerCase().includes(q);
+      return o.project.toLowerCase().includes(q) || o.client.toLowerCase().includes(q) || (o.ref || '').toLowerCase().includes(q);
     })
     .sort(byUrgency('freelancer'));
 
@@ -92,7 +92,7 @@ const OrdersTable = ({ orders, onOpen }) => {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{order.project}</div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                          {order.id} &middot; {order.client}
+                          {order.ref} &middot; {order.client}
                           {unread > 0 && <span style={{ color: 'var(--mint-deep)', fontWeight: 600 }}> &middot; {unread} new</span>}
                         </div>
                       </div>

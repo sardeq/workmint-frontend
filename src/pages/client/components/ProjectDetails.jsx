@@ -216,7 +216,7 @@ const ProjectDetails = ({ order, onBack, onApprove, onRequestRevision, onDecideS
             </div>
             <div className="d-flex align-items-center gap-2 text-muted" style={{ fontSize: '0.85rem' }}>
               <Avatar name={order.freelancer.name} size={24} />
-              {order.freelancer.name} &middot; {order.freelancer.title} &middot; {order.id}
+              {order.freelancer.name} &middot; {order.freelancer.title} &middot; {order.ref}
             </div>
             <p className="text-muted mt-2 mb-0" style={{ fontSize: '0.87rem', maxWidth: 620 }}>{order.brief}</p>
           </div>

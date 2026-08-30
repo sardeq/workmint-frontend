@@ -19,7 +19,7 @@ const Payments = ({ orders, methods, onAddMethod, onSetPrimary }) => {
     id: `${order.id}-fund`,
     at: order.startedOn,
     label: `Funded escrow for ${order.project}`,
-    sub: `${order.freelancer.name} - ${order.id}`,
+    sub: `${order.freelancer.name} - ${order.ref}`,
     amount: grossWithClientFee(orderTotal(order)),
     kind: 'charge',
   }));
@@ -31,7 +31,7 @@ const Payments = ({ orders, methods, onAddMethod, onSetPrimary }) => {
         id: `${order.id}-${m.id}`,
         at: m.approvedOn || order.deadline,
         label: `Released "${m.title}"`,
-        sub: `${order.freelancer.name} - ${order.id}`,
+        sub: `${order.freelancer.name} - ${order.ref}`,
         amount: m.amount,
         kind: 'release',
       }))

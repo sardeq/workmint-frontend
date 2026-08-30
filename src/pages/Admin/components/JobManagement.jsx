@@ -145,7 +145,7 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
                     <td>
                       <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{order.project}</div>
                       <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                        {order.id} &middot; {order.milestones.length} milestones
+                        {order.ref} &middot; {order.milestones.length} milestones
                       </div>
                     </td>
                     <td>

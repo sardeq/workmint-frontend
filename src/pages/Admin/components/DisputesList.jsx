@@ -25,7 +25,7 @@ const DisputesList = ({ disputes, orders, onReview, onTriage }) => {
     .filter((d) => {
       const q = search.toLowerCase();
       return (
-        d.id.toLowerCase().includes(q) ||
+        String(d.id).includes(q) ||
         d.client.toLowerCase().includes(q) ||
         d.freelancer.toLowerCase().includes(q) ||
         d.project.toLowerCase().includes(q)
@@ -111,7 +111,7 @@ const DisputesList = ({ disputes, orders, onReview, onTriage }) => {
                     <td>
                       <span className="wm-num">{money(dispute.amount)}</span>
                       {order && (
-                        <div className="text-muted" style={{ fontSize: '0.76rem' }}>{order.id}</div>
+                        <div className="text-muted" style={{ fontSize: '0.76rem' }}>{order.ref}</div>
                       )}
                     </td>
                     <td className="text-muted" style={{ fontSize: '0.84rem' }}>{timeAgo(dispute.openedAt)}</td>

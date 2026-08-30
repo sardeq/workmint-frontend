@@ -20,8 +20,7 @@ const ROLES = [
 
 const BLANK = { name: '', email: '', company: '', title: '', password: '', confirm: '', accepted: false };
 
-/* Password strength is advisory, not a gate. The only hard rule is length,
-   which is enforced in AuthContext so the backend can mirror it later. */
+
 const strengthOf = (password) => {
   if (!password) return { score: 0, label: '', tone: 'muted' };
   let score = 0;
@@ -52,9 +51,9 @@ const AuthPage = ({ mode }) => {
 
   const set = (patch) => { setForm({ ...form, ...patch }); setError(''); setField(''); };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    const result = login(form.email, form.password);
+    const result = await login(form.email, form.password);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -62,9 +61,9 @@ const AuthPage = ({ mode }) => {
     navigate(HOME_FOR[result.user.role] || '/');
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    const result = register({ ...form, role });
+    const result = await register({ ...form, role });
     if (!result.ok) {
       setError(result.error);
       setField(result.field || '');

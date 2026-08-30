@@ -238,7 +238,7 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
             </div>
             <div className="d-flex align-items-center gap-2 text-muted" style={{ fontSize: '0.85rem' }}>
               <Avatar name={order.client} size={24} tone="slate" />
-              {order.client} &middot; {order.id} &middot; started {shortDate(order.startedOn)}
+              {order.client} &middot; {order.ref} &middot; started {shortDate(order.startedOn)}
             </div>
             <p className="text-muted mt-2 mb-0" style={{ fontSize: '0.87rem', maxWidth: 620 }}>{order.brief}</p>
           </div>

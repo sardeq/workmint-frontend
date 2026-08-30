@@ -33,7 +33,7 @@ const ClientProjects = ({ orders, onOpen, onGo }) => {
       return (
         o.project.toLowerCase().includes(q) ||
         o.freelancer.name.toLowerCase().includes(q) ||
-        o.id.toLowerCase().includes(q)
+        (o.ref || '').toLowerCase().includes(q)
       );
     })
     .sort(byUrgency('client'));
