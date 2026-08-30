@@ -89,7 +89,7 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
                 {activity.map((a) => (
                   <li key={a.id} className={a.actor === 'system' ? 'is-system' : a.actor === 'client' ? 'is-client' : ''}>
                     {a.text}
-                    <time>{a.order.id} &middot; {timeAgo(a.at)}</time>
+                    <time>{a.order.ref} &middot; {timeAgo(a.at)}</time>
                   </li>
                 ))}
               </ul>

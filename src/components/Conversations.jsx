@@ -91,7 +91,7 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
                 <div>
                   <div style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>{other(active)}</div>
                   <div className="text-muted" style={{ fontSize: '0.8rem' }}>
-                    {active.project} &middot; {active.id}
+                    {active.project} &middot; {active.ref}
                   </div>
                 </div>
                 <div className="d-flex align-items-center gap-2">

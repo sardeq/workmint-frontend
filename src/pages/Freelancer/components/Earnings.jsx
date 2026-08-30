@@ -10,6 +10,8 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
   const [method, setMethod] = useState('Bank transfer');
   const [error, setError] = useState('');
 
+  /* Every approved milestone is a credit, every withdrawal is a debit.
+     One ledger, so the numbers in the cards can always be traced to a row. */
   const credits = orders.flatMap((order) =>
     order.milestones
       .filter((m) => m.status === 'approved')
@@ -17,7 +19,7 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
         id: `${order.id}-${m.id}`,
         at: m.approvedOn || order.deadline,
         label: m.title,
-        sub: `${order.client} - ${order.id}`,
+        sub: `${order.client} - ${order.ref}`,
         gross: m.amount,
         net: netOf(m.amount),
         kind: 'credit',

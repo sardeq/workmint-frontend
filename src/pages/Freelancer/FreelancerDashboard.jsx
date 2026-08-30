@@ -152,7 +152,7 @@ const FreelancerDashboard = () => {
   return (
     <Layout
       title={selectedOrder ? selectedOrder.project : activeTab === 'Overview' ? `Welcome back, ${firstName}` : pageTitle}
-      subtitle={selectedOrder ? `${selectedOrder.id} for ${selectedOrder.client}` : pageSub}
+      subtitle={selectedOrder ? `${selectedOrder.ref} for ${selectedOrder.client}` : pageSub}
       activeTab={activeTab}
       setActiveTab={handleTabChange}
       badges={badges}
