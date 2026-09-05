@@ -13,7 +13,6 @@ const FREELANCERS = [
 const FreelancerGrid = ({ query = '', onJoin }) => {
   const term = query.trim().toLowerCase();
 
-  // Derived, not stored: the hero search filters this list directly.
   const visible = term
     ? FREELANCERS.filter((f) =>
         f.name.toLowerCase().includes(term) ||

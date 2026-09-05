@@ -1,6 +1,5 @@
 
 
-// pg returns NUMERIC as "1200.00", so every money value goes through this.
 const num = (value) => Number(value || 0);
 
 export const toUser = (row) => ({
@@ -25,7 +24,6 @@ export const toUser = (row) => ({
     volume: num(row.volume),
 });
 
-/* The freelancer's own editable profile, as ProfileEdit expects it. */
 export const toProfile = (row) => ({
     name: row.name,
     title: row.title || '',
@@ -56,7 +54,7 @@ export const toMilestone = (row) => ({
 
 export const toMessage = (row) => ({
     id: row.id,
-    from: row.sender_role,        // 'client' | 'freelancer'
+    from: row.sender_role,
     text: row.body,
     at: row.sent_at,
     read: row.read,
@@ -78,15 +76,12 @@ export const toChangeRequest = (row) => ({
     at: row.created_at,
 });
 
-/* An order row from the list endpoint has no children; one from
-   GET /api/orders/:id does. Both go through here, so a freshly fetched
-   order can replace a listed one without changing shape. */
 export const toOrder = (row) => ({
     id: row.id,
     ref: `ORD-${row.id}`,
     clientId: row.client_id,
     freelancerId: row.freelancer_id,
-    client: row.client,                       // company name
+    client: row.client,
     clientContact: row.client_contact,
     freelancer: {
         id: row.freelancer_id,
@@ -119,7 +114,6 @@ export const toJob = (row) => ({
     level: row.level,
     skills: row.skills || [],
     proposals: Number(row.proposal_count || 0),
-    // The card shows "posted Xh ago"; the API gives a timestamp.
     postedHours: Math.max(0, Math.round((Date.now() - new Date(row.created_at).getTime()) / 3600000)),
 });
 
@@ -133,7 +127,7 @@ export const toProposal = (row) => ({
     cover: row.cover,
     status: row.status,
     sentAt: row.sent_at,
-    plan: [],                                  // proposal_milestones, if you add the endpoint
+    plan: [],
     freelancerId: row.freelancer_id,
     freelancer: {
         name: row.freelancer_name,
@@ -178,8 +172,31 @@ export const toTalent = (row) => ({
     bio: row.bio || '',
 });
 
-/* Axios throws on 4xx/5xx. The server always answers with { message } or
-   { error }, so this pulls out whichever is there. */
+
+export const toPortfolioItem = (row) => ({
+    id: row.id,
+    title: row.title,
+    tech: row.tech || [],
+    link: row.link || '',
+    description: row.description || '',
+});
+
+export const toWithdrawal = (row) => ({
+    id: row.id,
+    amount: num(row.amount),
+    method: row.method,
+    status: row.status,
+    at: row.at,
+});
+
+export const toPaymentMethod = (row) => ({
+    id: row.id,
+    label: row.label,
+    kind: row.kind,
+    primary: row.is_primary,
+});
+
+
 export const errorText = (err, fallback = 'Something went wrong.') => {
     if (err && err.response && err.response.data) {
         return err.response.data.message || err.response.data.error || fallback;

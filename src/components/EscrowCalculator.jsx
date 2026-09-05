@@ -2,10 +2,6 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FEE_RATE } from '../data/freelancerData';
 
-/* Fee model, kept in one place so the landing page and the workspace agree:
-   - the client adds a small escrow fee on top of the budget
-   - the freelancer's payout has FEE_RATE deducted (same constant the
-     freelancer dashboard uses for netOf())                                  */
 const CLIENT_FEE_RATE = 0.03;
 
 const CURRENCIES = [
@@ -25,7 +21,7 @@ const EscrowCalculator = () => {
   const [budget, setBudget] = useState(1500);
   const [currency, setCurrency] = useState('JOD');
   const [rates, setRates] = useState({});
-  const [status, setStatus] = useState('loading'); // loading | live | offline
+  const [status, setStatus] = useState('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +34,6 @@ const EscrowCalculator = () => {
         setStatus('live');
       })
       .catch(() => {
-        // The page still has to work offline, so fall back to stored rates.
         if (cancelled) return;
         const fallback = {};
         CURRENCIES.forEach((c) => { fallback[c.code] = c.fallback; });

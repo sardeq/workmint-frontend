@@ -17,11 +17,8 @@ const Landing = () => {
 
   const navigate = useNavigate();
 
-  /* Both closing CTAs land on registration with the right side pre-selected. */
   const joinAs = (role) => navigate(`/register?role=${role}`);
 
-  /* Search filters the talent section and scrolls to it. The old version
-     popped an alert(), which is not an answer to anything. */
   const handleSearch = (e) => {
     e.preventDefault();
     setSubmittedQuery(searchQuery);

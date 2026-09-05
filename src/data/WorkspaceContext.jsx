@@ -2,12 +2,14 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Toast, ToastContainer } from 'react-bootstrap';
 
 import { useAuth } from './AuthContext';
-import { buildSeed, uid, money } from './freelancerData';
+import { uid, money } from './freelancerData';
 import {
     ordersApi, jobsApi, proposalsApi, milestonesApi, messagesApi, disputesApi, usersApi,
+    portfolioApi, withdrawalsApi, paymentMethodsApi,
 } from '../api/api';
 import {
     toOrder, toJob, toProposal, toDispute, toTalent, toProfile, errorText,
+    toPortfolioItem, toWithdrawal, toPaymentMethod,
 } from '../api/adapters';
 
 
@@ -29,26 +31,19 @@ export const WorkspaceProvider = ({ children }) => {
     const [notifications, setNotifications] = useState([]);
     const [savedJobIds, setSavedJobIds] = useState([]);
 
-    /* ---- not on the server yet, so these stay local ----
-       Portfolio and payment methods keep their seed rows because they are
-       only cosmetic. Withdrawals start EMPTY: the seed had a $1,440 payout
-       against seed earnings, and paired with real earnings from the database
-       that produced a negative available balance. */
-    const seed = buildSeed();
-    const [portfolio, setPortfolio] = useState(seed.portfolio);
+
+    const [portfolio, setPortfolio] = useState([]);
     const [withdrawals, setWithdrawals] = useState([]);
-    const [paymentMethods, setPaymentMethods] = useState(seed.paymentMethods);
+    const [paymentMethods, setPaymentMethods] = useState([]);
 
     const notify = (text, tone = 'success') => setToast({ id: uid('T'), text, tone });
 
-    /* ---------------- loading ---------------- */
 
-    // Which slice of the marketplace this account can see.
     const scope = () => {
         if (!currentUser) return {};
         if (currentUser.role === 'client') return { client_id: currentUser.id };
         if (currentUser.role === 'freelancer') return { freelancer_id: currentUser.id };
-        return {}; // admin sees everything
+        return {};
     };
 
     const loadWorkspace = async () => {
@@ -63,8 +58,6 @@ export const WorkspaceProvider = ({ children }) => {
                 disputesApi.getAll(),
             ]);
 
-            // The list endpoint returns no milestones or messages, and every
-            // screen needs them, so pull each order in full.
             const full = await Promise.all(orderRows.map((row) => ordersApi.getOne(row.id)));
 
             setOrders(full.map(toOrder));
@@ -73,12 +66,22 @@ export const WorkspaceProvider = ({ children }) => {
             setDisputes(disputeRows.map(toDispute));
 
             if (currentUser.role === 'client') {
-                const people = await usersApi.getAll({ role: 'freelancer', status: 'active' });
+                const [people, methodRows] = await Promise.all([
+                    usersApi.getAll({ role: 'freelancer', status: 'active' }),
+                    paymentMethodsApi.getAll(currentUser.id),
+                ]);
                 setTalent(people.map(toTalent));
+                setPaymentMethods(methodRows.map(toPaymentMethod));
             }
             if (currentUser.role === 'freelancer') {
-                const me = await usersApi.getOne(currentUser.id);
+                const [me, portfolioRows, withdrawalRows] = await Promise.all([
+                    usersApi.getOne(currentUser.id),
+                    portfolioApi.getAll(currentUser.id),
+                    withdrawalsApi.getAll(currentUser.id),
+                ]);
                 setProfile(toProfile(me));
+                setPortfolio(portfolioRows.map(toPortfolioItem));
+                setWithdrawals(withdrawalRows.map(toWithdrawal));
             }
         } catch (err) {
             notify(errorText(err, 'Could not load your workspace.'), 'warn');
@@ -93,12 +96,10 @@ export const WorkspaceProvider = ({ children }) => {
         } else {
             setOrders([]); setJobs([]); setProposals([]); setDisputes([]);
             setTalent([]); setProfile(null); setLoading(true);
+            setPortfolio([]); setWithdrawals([]); setPaymentMethods([]);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentUser]);
 
-    /* Notifications are derived from order activity rather than stored, so
-       there is no extra table or endpoint to keep in step. */
     useEffect(() => {
         const audienceOf = (actor) => (actor === 'client' ? 'freelancer' : 'client');
         setNotifications(
@@ -121,7 +122,6 @@ export const WorkspaceProvider = ({ children }) => {
     const markNotificationsRead = (audience) =>
         setNotifications((prev) => prev.map((n) => (n.audience === audience ? { ...n, read: true } : n)));
 
-    /* After any write, read the order back so the UI matches the database. */
     const refreshOrder = async (orderId) => {
         const fresh = await ordersApi.getOne(orderId);
         const mapped = toOrder(fresh);
@@ -144,7 +144,6 @@ export const WorkspaceProvider = ({ children }) => {
         setDisputes(rows.map(toDispute));
     };
 
-    /* ---------------- messaging ---------------- */
 
     const sendMessage = async (orderId, from, text) => {
         try {
@@ -160,12 +159,10 @@ export const WorkspaceProvider = ({ children }) => {
             await messagesApi.markRead(orderId, role);
             await refreshOrder(orderId);
         } catch (err) {
-            // Not worth a toast: the badge is just briefly wrong.
             console.error(errorText(err));
         }
     };
 
-    /* ---------------- freelancer ---------------- */
 
     const startMilestone = async (orderId, milestoneId) => {
         try {
@@ -318,8 +315,6 @@ export const WorkspaceProvider = ({ children }) => {
         }
     };
 
-    /* Hiring creates the contract server-side, so reload rather than trying
-       to guess what the new order looks like. */
     const acceptProposal = async (proposalId) => {
         try {
             const proposal = proposals.find((p) => p.id === proposalId);
@@ -391,39 +386,82 @@ export const WorkspaceProvider = ({ children }) => {
         }
     };
 
-    /* ------------- still local: no tables for these yet ------------- */
+    /* ---------------- portfolio ---------------- */
 
-    const savePortfolioItem = (item) => {
-        setPortfolio((prev) =>
-            item.id ? prev.map((p) => (p.id === item.id ? item : p)) : [...prev, { ...item, id: uid('PF') }]
-        );
-        notify(item.id ? 'Project updated' : 'Project added to your portfolio');
+    const savePortfolioItem = async (item) => {
+        try {
+            const body = {
+                title: item.title,
+                tech: item.tech,
+                link: item.link,
+                description: item.description,
+            };
+
+            if (item.id) {
+                const row = await portfolioApi.update(item.id, body);
+                const saved = toPortfolioItem(row);
+                setPortfolio((prev) => prev.map((p) => (p.id === saved.id ? saved : p)));
+                notify('Project updated');
+            } else {
+                const row = await portfolioApi.create({ ...body, user_id: currentUser.id });
+                setPortfolio((prev) => [...prev, toPortfolioItem(row)]);
+                notify('Project added to your portfolio');
+            }
+        } catch (err) {
+            notify(errorText(err, 'Could not save that project.'), 'warn');
+        }
     };
 
-    const deletePortfolioItem = (id) => {
-        setPortfolio((prev) => prev.filter((p) => p.id !== id));
-        notify('Project removed', 'warn');
+    const deletePortfolioItem = async (id) => {
+        try {
+            await portfolioApi.remove(id);
+            setPortfolio((prev) => prev.filter((p) => p.id !== id));
+            notify('Project removed', 'warn');
+        } catch (err) {
+            notify(errorText(err, 'Could not remove that project.'), 'warn');
+        }
     };
 
-    const requestWithdrawal = (amount, method) => {
-        setWithdrawals((prev) => [
-            { id: uid('WD'), amount, method, at: new Date().toISOString(), status: 'Processing' },
-            ...prev,
-        ]);
-        notify(`${money(amount)} on the way to your ${method.toLowerCase()}`);
+    /* ---------------- money out ---------------- */
+
+    const requestWithdrawal = async (amount, method) => {
+        try {
+            const row = await withdrawalsApi.create({
+                freelancer_id: currentUser.id,
+                amount: Number(amount),
+                method,
+            });
+            setWithdrawals((prev) => [toWithdrawal(row), ...prev]);
+            notify(`${money(Number(row.amount))} on the way to your ${method.toLowerCase()}`);
+        } catch (err) {
+            notify(errorText(err, 'Could not start that withdrawal.'), 'warn');
+        }
     };
 
-    const addPaymentMethod = (label, kind) => {
-        setPaymentMethods((prev) => [...prev, { id: uid('PM'), label, kind, primary: false }]);
-        notify('Payment method added');
+    const addPaymentMethod = async (label, kind) => {
+        try {
+            const row = await paymentMethodsApi.create({
+                client_id: currentUser.id,
+                label,
+                kind,
+            });
+            setPaymentMethods((prev) => [...prev, toPaymentMethod(row)]);
+            notify('Payment method added');
+        } catch (err) {
+            notify(errorText(err, 'Could not add that payment method.'), 'warn');
+        }
     };
 
-    const setPrimaryMethod = (id) => {
-        setPaymentMethods((prev) => prev.map((m) => ({ ...m, primary: m.id === id })));
-        notify('Primary payment method updated');
+    const setPrimaryMethod = async (id) => {
+        try {
+            await paymentMethodsApi.setPrimary(id);
+            setPaymentMethods((prev) => prev.map((m) => ({ ...m, primary: m.id === id })));
+            notify('Primary payment method updated');
+        } catch (err) {
+            notify(errorText(err, 'Could not update your payment methods.'), 'warn');
+        }
     };
 
-    /* The client's own details, read straight off the signed-in account. */
     const clientProfile = currentUser && currentUser.role === 'client'
         ? {
             company: currentUser.company,

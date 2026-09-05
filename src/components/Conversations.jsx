@@ -4,8 +4,6 @@ import Icon from './Icon';
 import { Pill, Avatar, EmptyState } from './Shared';
 import { timeAgo, unreadCount, orderStatus } from '../data/freelancerData';
 
-/* One threads screen for both portals. `role` decides whose bubbles are
-   right-aligned and who the counterparty is, nothing else changes. */
 const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
   const other = (order) => (role === 'client' ? order.freelancer.name : order.client);
 
@@ -22,7 +20,6 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
 
   useEffect(() => {
     if (activeId) onRead(activeId, role);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
   useEffect(() => {

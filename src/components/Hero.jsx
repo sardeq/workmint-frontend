@@ -2,9 +2,6 @@ import React from 'react';
 import Icon from './Icon';
 import { money } from '../data/freelancerData';
 
-/* The right-hand card is a slice of the real workspace: same milestone rail,
-   same released-vs-held split. The pitch is "you can see where the money is",
-   so the hero shows it instead of describing it. */
 const RECEIPT = {
   id: 'ORD-892',
   project: 'C++ systems architecture',

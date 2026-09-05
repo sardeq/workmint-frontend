@@ -66,3 +66,24 @@ export const disputesApi = {
     resolve: (id, resolution, note) =>
         api.put(`/disputes/${id}/resolve`, { resolution, note }).then((r) => r.data),
 };
+
+export const portfolioApi = {
+    getAll: (userId) => api.get("/portfolio", { params: { user_id: userId } }).then((r) => r.data),
+    create: (body) => api.post("/portfolio", body).then((r) => r.data),
+    update: (id, body) => api.put(`/portfolio/${id}`, body).then((r) => r.data),
+    remove: (id) => api.delete(`/portfolio/${id}`).then((r) => r.data),
+};
+
+export const withdrawalsApi = {
+    getAll: (freelancerId) =>
+        api.get("/withdrawals", { params: { freelancer_id: freelancerId } }).then((r) => r.data),
+    create: (body) => api.post("/withdrawals", body).then((r) => r.data),
+};
+
+export const paymentMethodsApi = {
+    getAll: (clientId) =>
+        api.get("/payment-methods", { params: { client_id: clientId } }).then((r) => r.data),
+    create: (body) => api.post("/payment-methods", body).then((r) => r.data),
+    setPrimary: (id) => api.put(`/payment-methods/${id}/primary`).then((r) => r.data),
+    remove: (id) => api.delete(`/payment-methods/${id}`).then((r) => r.data),
+};

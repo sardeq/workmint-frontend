@@ -11,7 +11,6 @@ const ProfileEdit = ({ profile, onSave }) => {
   const [skillInput, setSkillInput] = useState('');
   const [errors, setErrors] = useState({});
 
-  // Keep the form in step with whatever the parent holds.
   useEffect(() => { if (profile) setForm(profile); }, [profile]);
 
   if (!profile) return null;
@@ -28,7 +27,6 @@ const ProfileEdit = ({ profile, onSave }) => {
 
   const removeSkill = (skill) => set({ skills: form.skills.filter((s) => s !== skill) });
 
-  /* Profile strength is the checklist clients actually judge you on. */
   const checks = [
     { label: 'Name and title', done: Boolean(form.name && form.title) },
     { label: `Bio of ${MIN_BIO}+ characters`, done: (form.bio || '').length >= MIN_BIO },
