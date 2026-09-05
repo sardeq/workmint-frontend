@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Row, Col, Form, Button } from 'react-bootstrap';
 import Icon from './Icon';
 import { Pill, Avatar, EmptyState } from './Shared';
@@ -14,7 +14,6 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
 
   const [activeId, setActiveId] = useState(sorted.length ? sorted[0].id : null);
   const [text, setText] = useState('');
-  const endRef = useRef(null);
 
   const active = orders.find((o) => o.id === activeId) || null;
 
@@ -23,8 +22,9 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
   }, [activeId]);
 
   useEffect(() => {
-    const node = endRef.current;
-    if (node && node.scrollIntoView) node.scrollIntoView({ block: 'nearest' });
+    // Scroll the newest message into view (plain DOM, no ref needed).
+    const node = document.getElementById('conversations-chat-end');
+    if (node) node.scrollIntoView({ block: 'nearest' });
   }, [activeId, active ? active.messages.length : 0]);
 
   const handleSend = (e) => {
@@ -112,7 +112,7 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
                         </div>
                       </div>
                     ))}
-                    <div ref={endRef} />
+                    <div id="conversations-chat-end" />
                   </div>
                 )}
 

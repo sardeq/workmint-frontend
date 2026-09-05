@@ -19,10 +19,12 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
     .map((order) => ({ order, action: clientNextAction(order) }))
     .sort((a, b) => new Date(a.order.deadline) - new Date(b.order.deadline));
 
-  const activity = orders
-    .flatMap((o) => o.activity.map((a) => ({ ...a, order: o })))
-    .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 6);
+  const activity = [];
+  orders.forEach((o) => {
+    o.activity.forEach((a) => activity.push({ ...a, order: o }));
+  });
+  activity.sort((a, b) => new Date(b.at) - new Date(a.at));
+  const latestActivity = activity.slice(0, 6);
 
   return (
     <>
@@ -115,11 +117,11 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
             <h5 className="m-0 mb-3" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>
               Recent activity
             </h5>
-            {activity.length === 0 ? (
+            {latestActivity.length === 0 ? (
               <p className="text-muted small m-0">Nothing has happened yet.</p>
             ) : (
               <ul className="wm-timeline">
-                {activity.map((a) => (
+                {latestActivity.map((a) => (
                   <li key={a.id} className={a.actor === 'freelancer' ? 'is-client' : a.actor === 'system' ? 'is-system' : ''}>
                     {a.text}
                     <time>{a.order.ref} &middot; {timeAgo(a.at)}</time>

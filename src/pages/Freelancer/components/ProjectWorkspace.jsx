@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Form, Row, Col, Modal, Alert } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, EmptyState, Avatar } from '../../../components/Shared';
@@ -19,7 +19,6 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
   const [scopeForm, setScopeForm] = useState({ reason: '', extraCost: '', extraDays: '' });
   const [scopeError, setScopeError] = useState('');
 
-  const chatEndRef = useRef(null);
   const unread = unreadCount(order);
   const status = orderStatus(order);
 
@@ -31,8 +30,9 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
 
   // Keep the newest message in view.
   useEffect(() => {
-    const node = chatEndRef.current;
-    if (tab === 'messages' && node && node.scrollIntoView) {
+    // Scroll the newest message into view (plain DOM, no ref needed).
+    const node = document.getElementById('workspace-chat-end');
+    if (tab === 'messages' && node) {
       node.scrollIntoView({ block: 'nearest' });
     }
   }, [tab, order.messages.length]);
@@ -307,7 +307,7 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
                   <div className="wm-bubble__meta">{m.from === 'freelancer' ? 'You' : order.client} &middot; {timeAgo(m.at)}</div>
                 </div>
               ))}
-              <div ref={chatEndRef} />
+              <div id="workspace-chat-end" />
             </div>
           )}
 

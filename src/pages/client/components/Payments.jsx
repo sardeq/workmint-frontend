@@ -24,18 +24,20 @@ const Payments = ({ orders, methods, onAddMethod, onSetPrimary }) => {
     kind: 'charge',
   }));
 
-  const releases = orders.flatMap((order) =>
-    order.milestones
-      .filter((m) => m.status === 'approved')
-      .map((m) => ({
+  const releases = [];
+  orders.forEach((order) => {
+    order.milestones.forEach((m) => {
+      if (m.status !== 'approved') return;
+      releases.push({
         id: `${order.id}-${m.id}`,
         at: m.approvedOn || order.deadline,
         label: `Released "${m.title}"`,
         sub: `${order.freelancer.name} - ${order.ref}`,
         amount: m.amount,
         kind: 'release',
-      }))
-  );
+      });
+    });
+  });
 
   const ledger = [...fundings, ...releases].sort((a, b) => new Date(b.at) - new Date(a.at));
 

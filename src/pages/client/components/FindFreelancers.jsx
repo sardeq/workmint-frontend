@@ -13,7 +13,12 @@ const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
   const [inviting, setInviting] = useState(null);
   const [jobId, setJobId] = useState('');
 
-  const skills = ['All', ...Array.from(new Set(talent.flatMap((t) => t.skills)))];
+  const skills = ['All'];
+  talent.forEach((person) => {
+    person.skills.forEach((skill) => {
+      if (!skills.includes(skill)) skills.push(skill);
+    });
+  });
 
   const visible = talent
     .filter((person) => {

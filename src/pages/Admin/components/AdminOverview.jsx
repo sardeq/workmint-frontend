@@ -13,10 +13,12 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
   const activeOrders = orders.filter((o) => orderStatus(o).key !== 'completed');
 
   /* Everything happening on the platform, newest first. */
-  const activity = orders
-    .flatMap((o) => o.activity.map((a) => ({ ...a, order: o })))
-    .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 8);
+  const activity = [];
+  orders.forEach((o) => {
+    o.activity.forEach((a) => activity.push({ ...a, order: o }));
+  });
+  activity.sort((a, b) => new Date(b.at) - new Date(a.at));
+  const latestActivity = activity.slice(0, 8);
 
   const biggest = [...activeOrders]
     .sort((a, b) => orderEscrow(b) - orderEscrow(a))
@@ -82,11 +84,11 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
             <h5 className="m-0 mb-3" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>
               Platform activity
             </h5>
-            {activity.length === 0 ? (
+            {latestActivity.length === 0 ? (
               <p className="text-muted small m-0">Nothing has happened yet.</p>
             ) : (
               <ul className="wm-timeline">
-                {activity.map((a) => (
+                {latestActivity.map((a) => (
                   <li key={a.id} className={a.actor === 'system' ? 'is-system' : a.actor === 'client' ? 'is-client' : ''}>
                     {a.text}
                     <time>{a.order.ref} &middot; {timeAgo(a.at)}</time>

@@ -12,10 +12,11 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
 
   /* Every approved milestone is a credit, every withdrawal is a debit.
      One ledger, so the numbers in the cards can always be traced to a row. */
-  const credits = orders.flatMap((order) =>
-    order.milestones
-      .filter((m) => m.status === 'approved')
-      .map((m) => ({
+  const credits = [];
+  orders.forEach((order) => {
+    order.milestones.forEach((m) => {
+      if (m.status !== 'approved') return;
+      credits.push({
         id: `${order.id}-${m.id}`,
         at: m.approvedOn || order.deadline,
         label: m.title,
@@ -23,8 +24,9 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
         gross: m.amount,
         net: netOf(m.amount),
         kind: 'credit',
-      }))
-  );
+      });
+    });
+  });
 
   const debits = withdrawals.map((w) => ({
     id: w.id,
@@ -47,11 +49,16 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
   const feesPaid = credits.reduce((sum, c) => sum + (c.gross - c.net), 0);
 
   /* Last six months of released earnings, drawn with divs. */
-  const months = Array.from({ length: 6 }, (_, i) => {
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
     const d = new Date();
-    d.setMonth(d.getMonth() - (5 - i), 1);
-    return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('en-US', { month: 'short' }), total: 0 };
-  });
+    d.setMonth(d.getMonth() - i, 1);
+    months.push({
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      label: d.toLocaleDateString('en-US', { month: 'short' }),
+      total: 0,
+    });
+  }
   credits.forEach((c) => {
     const d = new Date(c.at);
     const bucket = months.find((m) => m.key === `${d.getFullYear()}-${d.getMonth()}`);

@@ -51,34 +51,35 @@ export const WorkspaceProvider = ({ children }) => {
         setLoading(true);
         try {
             const params = scope();
-            const [orderRows, jobRows, proposalRows, disputeRows] = await Promise.all([
-                ordersApi.getAll(params),
-                jobsApi.getAll(),
-                proposalsApi.getAll(params),
-                disputesApi.getAll(),
-            ]);
 
-            const full = await Promise.all(orderRows.map((row) => ordersApi.getOne(row.id)));
+            const orderRows = await ordersApi.getAll(params);
+            const jobRows = await jobsApi.getAll();
+            const proposalRows = await proposalsApi.getAll(params);
+            const disputeRows = await disputesApi.getAll();
 
-            setOrders(full.map(toOrder));
+            /* The list endpoint gives the order rows only. Ask for each one
+               again to get its milestones, messages and activity with it. */
+            const full = [];
+            for (let i = 0; i < orderRows.length; i++) {
+                const one = await ordersApi.getOne(orderRows[i].id);
+                full.push(toOrder(one));
+            }
+
+            setOrders(full);
             setJobs(jobRows.map(toJob));
             setProposals(proposalRows.map(toProposal));
             setDisputes(disputeRows.map(toDispute));
 
             if (currentUser.role === 'client') {
-                const [people, methodRows] = await Promise.all([
-                    usersApi.getAll({ role: 'freelancer', status: 'active' }),
-                    paymentMethodsApi.getAll(currentUser.id),
-                ]);
+                const people = await usersApi.getAll({ role: 'freelancer', status: 'active' });
+                const methodRows = await paymentMethodsApi.getAll(currentUser.id);
                 setTalent(people.map(toTalent));
                 setPaymentMethods(methodRows.map(toPaymentMethod));
             }
             if (currentUser.role === 'freelancer') {
-                const [me, portfolioRows, withdrawalRows] = await Promise.all([
-                    usersApi.getOne(currentUser.id),
-                    portfolioApi.getAll(currentUser.id),
-                    withdrawalsApi.getAll(currentUser.id),
-                ]);
+                const me = await usersApi.getOne(currentUser.id);
+                const portfolioRows = await portfolioApi.getAll(currentUser.id);
+                const withdrawalRows = await withdrawalsApi.getAll(currentUser.id);
                 setProfile(toProfile(me));
                 setPortfolio(portfolioRows.map(toPortfolioItem));
                 setWithdrawals(withdrawalRows.map(toWithdrawal));
@@ -101,22 +102,25 @@ export const WorkspaceProvider = ({ children }) => {
     }, [currentUser]);
 
     useEffect(() => {
+        // An entry written by the client is news for the freelancer, and vice versa.
         const audienceOf = (actor) => (actor === 'client' ? 'freelancer' : 'client');
-        setNotifications(
-            orders
-                .flatMap((order) =>
-                    order.activity.map((a) => ({
-                        id: `N-${order.id}-${a.id}`,
-                        at: a.at,
-                        text: a.text,
-                        orderId: order.id,
-                        audience: audienceOf(a.actor),
-                        read: false,
-                    }))
-                )
-                .sort((a, b) => new Date(b.at) - new Date(a.at))
-                .slice(0, 12)
-        );
+
+        const rows = [];
+        orders.forEach((order) => {
+            order.activity.forEach((a) => {
+                rows.push({
+                    id: `N-${order.id}-${a.id}`,
+                    at: a.at,
+                    text: a.text,
+                    orderId: order.id,
+                    audience: audienceOf(a.actor),
+                    read: false,
+                });
+            });
+        });
+
+        rows.sort((a, b) => new Date(b.at) - new Date(a.at));
+        setNotifications(rows.slice(0, 12));
     }, [orders]);
 
     const markNotificationsRead = (audience) =>
@@ -319,7 +323,8 @@ export const WorkspaceProvider = ({ children }) => {
         try {
             const proposal = proposals.find((p) => p.id === proposalId);
             const row = await proposalsApi.accept(proposalId);
-            await Promise.all([refreshProposals(), refreshJobs()]);
+            await refreshProposals();
+            await refreshJobs();
 
             const created = toOrder(await ordersApi.getOne(row.id));
             setOrders((prev) => [created, ...prev]);
@@ -357,7 +362,8 @@ export const WorkspaceProvider = ({ children }) => {
                 reason: form.reason,
                 detail: form.detail,
             });
-            await Promise.all([refreshOrder(orderId), refreshDisputes()]);
+            await refreshOrder(orderId);
+            await refreshDisputes();
             notify('Dispute opened. A mediator will review it.', 'warn');
         } catch (err) {
             notify(errorText(err, 'Could not open that dispute.'), 'warn');

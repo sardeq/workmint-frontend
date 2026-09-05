@@ -16,7 +16,12 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
   const [applyingTo, setApplyingTo] = useState(null);
 
   // Skills are derived from the listings, so the filter never goes out of date.
-  const skills = ['All', ...Array.from(new Set(jobs.flatMap((j) => j.skills)))];
+  const skills = ['All'];
+  jobs.forEach((job) => {
+    job.skills.forEach((skill) => {
+      if (!skills.includes(skill)) skills.push(skill);
+    });
+  });
 
   const appliedIds = proposals.filter((p) => p.status !== 'Withdrawn').map((p) => p.jobId);
 

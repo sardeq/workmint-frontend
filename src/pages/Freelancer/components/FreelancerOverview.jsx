@@ -25,10 +25,21 @@ const FreelancerOverview = ({ orders, proposals, withdrawals, profile, onOpenOrd
     .filter((row) => row.action)
     .sort((a, b) => new Date(a.order.deadline) - new Date(b.order.deadline));
 
-  const activity = orders
-    .flatMap((o) => o.activity.map((a) => ({ ...a, order: o })))
-    .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 6);
+  const activity = [];
+  orders.forEach((o) => {
+    o.activity.forEach((a) => activity.push({ ...a, order: o }));
+  });
+  activity.sort((a, b) => new Date(b.at) - new Date(a.at));
+  const latestActivity = activity.slice(0, 6);
+
+  /* Milestones still to be delivered, soonest deadline first. */
+  const upcoming = [];
+  active.forEach((o) => {
+    o.milestones.forEach((m) => {
+      if (m.status !== 'approved') upcoming.push({ m, o });
+    });
+  });
+  upcoming.sort((a, b) => new Date(a.m.dueDate) - new Date(b.m.dueDate));
 
   return (
     <>
@@ -121,11 +132,11 @@ const FreelancerOverview = ({ orders, proposals, withdrawals, profile, onOpenOrd
             <h5 className="m-0 mb-3" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>
               Recent activity
             </h5>
-            {activity.length === 0 ? (
+            {latestActivity.length === 0 ? (
               <p className="text-muted small m-0">Nothing has happened yet.</p>
             ) : (
               <ul className="wm-timeline">
-                {activity.map((a) => (
+                {latestActivity.map((a) => (
                   <li key={a.id} className={a.actor === 'client' ? 'is-client' : a.actor === 'system' ? 'is-system' : ''}>
                     {a.text}
                     <time>{a.order.ref} &middot; {timeAgo(a.at)}</time>
@@ -144,9 +155,7 @@ const FreelancerOverview = ({ orders, proposals, withdrawals, profile, onOpenOrd
             {active.length === 0 ? (
               <p className="text-muted small m-0">No active orders.</p>
             ) : (
-              active
-                .flatMap((o) => o.milestones.filter((m) => m.status !== 'approved').map((m) => ({ m, o })))
-                .sort((a, b) => new Date(a.m.dueDate) - new Date(b.m.dueDate))
+              upcoming
                 .slice(0, 5)
                 .map(({ m, o }) => (
                   <div key={m.id} className="d-flex justify-content-between align-items-center py-2 border-bottom">

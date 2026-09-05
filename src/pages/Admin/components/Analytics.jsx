@@ -54,11 +54,16 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
   const disputeRate = orders.length ? Math.round((disputes.length / orders.length) * 100) : 0;
 
   /* Released per month for the last six, straight from approved milestones. */
-  const months = Array.from({ length: 6 }, (_, i) => {
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
     const d = new Date();
-    d.setMonth(d.getMonth() - (5 - i), 1);
-    return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('en-US', { month: 'short' }), total: 0 };
-  });
+    d.setMonth(d.getMonth() - i, 1);
+    months.push({
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      label: d.toLocaleDateString('en-US', { month: 'short' }),
+      total: 0,
+    });
+  }
 
   orders.forEach((order) =>
     order.milestones
@@ -71,18 +76,29 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
   );
   const peak = Math.max(...months.map((m) => m.total), 1);
 
-  /* Earnings by freelancer and spend by client, both derived from orders. */
-  const byFreelancer = {};
-  const byClient = {};
+  /* Earnings by freelancer and spend by client, both derived from orders.
+     Each list holds { name, amount } rows, so one small helper builds both. */
+  const addTo = (list, name, amount) => {
+    const found = list.find((row) => row.name === name);
+    if (found) {
+      found.amount += amount;
+    } else {
+      list.push({ name: name, amount: amount });
+    }
+  };
+
+  const freelancerTotals = [];
+  const clientTotals = [];
   orders.forEach((order) => {
     const earned = orderReleased(order);
-    const name = order.freelancer.name;
-    byFreelancer[name] = (byFreelancer[name] || 0) + earned;
-    byClient[order.client] = (byClient[order.client] || 0) + earned;
+    addTo(freelancerTotals, order.freelancer.name, earned);
+    addTo(clientTotals, order.client, earned);
   });
 
-  const topFreelancers = Object.entries(byFreelancer).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const topClients = Object.entries(byClient).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  freelancerTotals.sort((a, b) => b.amount - a.amount);
+  clientTotals.sort((a, b) => b.amount - a.amount);
+  const topFreelancers = freelancerTotals.slice(0, 5);
+  const topClients = clientTotals.slice(0, 5);
 
   return (
     <>
@@ -181,11 +197,11 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
             ) : (
               <Table hover responsive className="align-middle">
                 <tbody>
-                  {topFreelancers.map(([name, amount], index) => (
-                    <tr key={name}>
+                  {topFreelancers.map((row, index) => (
+                    <tr key={row.name}>
                       <td style={{ width: 30 }} className="text-muted">{index + 1}</td>
-                      <td style={{ fontWeight: 600, color: 'var(--slate-dark)', fontSize: '0.89rem' }}>{name}</td>
-                      <td className="text-end wm-num" style={{ fontSize: '0.9rem' }}>{show(amount)}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--slate-dark)', fontSize: '0.89rem' }}>{row.name}</td>
+                      <td className="text-end wm-num" style={{ fontSize: '0.9rem' }}>{show(row.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -201,11 +217,11 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
             </div>
             <Table hover responsive className="align-middle">
               <tbody>
-                {topClients.map(([name, amount], index) => (
-                  <tr key={name}>
+                {topClients.map((row, index) => (
+                  <tr key={row.name}>
                     <td style={{ width: 30 }} className="text-muted">{index + 1}</td>
-                    <td style={{ fontWeight: 600, color: 'var(--slate-dark)', fontSize: '0.89rem' }}>{name}</td>
-                    <td className="text-end wm-num" style={{ fontSize: '0.9rem' }}>{show(amount)}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--slate-dark)', fontSize: '0.89rem' }}>{row.name}</td>
+                    <td className="text-end wm-num" style={{ fontSize: '0.9rem' }}>{show(row.amount)}</td>
                   </tr>
                 ))}
               </tbody>

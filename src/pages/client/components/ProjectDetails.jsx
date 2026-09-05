@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Form, Row, Col, Modal, Alert } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, EmptyState, Avatar } from '../../../components/Shared';
@@ -21,7 +21,6 @@ const ProjectDetails = ({ order, onBack, onApprove, onRequestRevision, onDecideS
   const [confirming, setConfirming] = useState(null); // milestone pending approval
   const [showDispute, setShowDispute] = useState(false);
 
-  const chatEndRef = useRef(null);
   const unread = unreadCount(order, 'client');
   const status = orderStatus(order, 'client');
   const pendingScope = order.changeRequests.filter((cr) => cr.status === 'Pending').length;
@@ -32,8 +31,9 @@ const ProjectDetails = ({ order, onBack, onApprove, onRequestRevision, onDecideS
   }, [tab, order.id]);
 
   useEffect(() => {
-    const node = chatEndRef.current;
-    if (tab === 'messages' && node && node.scrollIntoView) node.scrollIntoView({ block: 'nearest' });
+    // Scroll the newest message into view (plain DOM, no ref needed).
+    const node = document.getElementById('project-chat-end');
+    if (tab === 'messages' && node) node.scrollIntoView({ block: 'nearest' });
   }, [tab, order.messages.length]);
 
   const confirmApprove = () => {
@@ -285,7 +285,7 @@ const ProjectDetails = ({ order, onBack, onApprove, onRequestRevision, onDecideS
                   </div>
                 </div>
               ))}
-              <div ref={chatEndRef} />
+              <div id="project-chat-end" />
             </div>
           )}
 
