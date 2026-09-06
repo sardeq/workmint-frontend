@@ -1,14 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Row, Col, Table, Button, Modal, Form, Alert } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { StatCard, Pill, EmptyState } from '../../../components/Shared';
 import {
-  money, shortDate, timeAgo, orderStatus, orderTotal, orderEscrow, orderReleased,
-  grossWithClientFee, CLIENT_FEE_RATE,
-} from '../../../data/freelancerData';
+  money, num, shortDate, timeAgo, orderRef, orderStatus, orderTotal, orderEscrow, orderReleased,
+  grossWithClientFee, milestonesOf, CLIENT_FEE_RATE,
+} from '../../../data/helpers';
 
-/* The mirror of the freelancer's Earnings screen: same ledger, other side.
-   Funding is a charge, every approved milestone is a release.               */
 const Payments = ({ orders, methods, onAddMethod, onSetPrimary }) => {
   const [show, setShow] = useState(false);
   const [label, setLabel] = useState('');
@@ -16,40 +14,41 @@ const Payments = ({ orders, methods, onAddMethod, onSetPrimary }) => {
   const [error, setError] = useState('');
 
   const fundings = orders.map((order) => ({
-    id: `${order.id}-fund`,
-    at: order.startedOn,
+    id: `F-${order.id}`,
+    at: order.started_on,
     label: `Funded escrow for ${order.project}`,
-    sub: `${order.freelancer.name} - ${order.ref}`,
+    sub: `${order.freelancer_name} - ${orderRef(order)}`,
     amount: grossWithClientFee(orderTotal(order)),
     kind: 'charge',
   }));
 
-  const releases = [];
-  orders.forEach((order) => {
-    order.milestones.forEach((m) => {
-      if (m.status !== 'approved') return;
-      releases.push({
-        id: `${order.id}-${m.id}`,
-        at: m.approvedOn || order.deadline,
-        label: `Released "${m.title}"`,
-        sub: `${order.freelancer.name} - ${order.ref}`,
-        amount: m.amount,
+  const releases = orders.flatMap((order) =>
+    milestonesOf(order)
+      .filter((milestone) => milestone.status === 'approved')
+      .map((milestone) => ({
+        id: `R-${order.id}-${milestone.id}`,
+        at: milestone.approved_on || order.deadline,
+        label: `Released "${milestone.title}"`,
+        sub: `${order.freelancer_name} - ${orderRef(order)}`,
+        amount: num(milestone.amount),
         kind: 'release',
-      });
-    });
-  });
+      }))
+  );
 
   const ledger = [...fundings, ...releases].sort((a, b) => new Date(b.at) - new Date(a.at));
 
-  const active = orders.filter((o) => orderStatus(o).key !== 'completed');
-  const inEscrow = active.reduce((sum, o) => sum + orderEscrow(o), 0);
-  const released = orders.reduce((sum, o) => sum + orderReleased(o), 0);
-  const committed = orders.reduce((sum, o) => sum + orderTotal(o), 0);
+  const active = orders.filter((order) => orderStatus(order).key !== 'completed');
+  const inEscrow = active.reduce((sum, order) => sum + orderEscrow(order), 0);
+  const released = orders.reduce((sum, order) => sum + orderReleased(order), 0);
+  const committed = orders.reduce((sum, order) => sum + orderTotal(order), 0);
   const fees = Math.round(committed * CLIENT_FEE_RATE);
 
   const handleAdd = (e) => {
     e.preventDefault();
-    if (label.trim().length < 4) return setError('Give the method a name you will recognise later.');
+    if (label.trim().length < 4) {
+      setError('Give the method a name you will recognise later.');
+      return;
+    }
     onAddMethod(label.trim(), kind);
     setLabel('');
     setError('');
@@ -103,7 +102,7 @@ const Payments = ({ orders, methods, onAddMethod, onSetPrimary }) => {
                     <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{method.label}</div>
                     <div className="text-muted" style={{ fontSize: '0.78rem' }}>{method.kind}</div>
                   </div>
-                  {method.primary ? (
+                  {method.is_primary ? (
                     <Pill tone="success">Primary</Pill>
                   ) : (
                     <Button size="sm" variant="link" className="p-0" onClick={() => onSetPrimary(method.id)}>

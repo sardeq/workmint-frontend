@@ -1,21 +1,19 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Row, Col, Button, Modal, Table } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, StatCard, EmptyState, Avatar } from '../../../components/Shared';
-import { money, timeAgo, grossWithClientFee, CLIENT_FEE_RATE } from '../../../data/freelancerData';
+import { money, num, timeAgo, grossWithClientFee, CLIENT_FEE_RATE } from '../../../data/helpers';
 
 const STATUS_TONE = { Pending: 'warn', Accepted: 'success', Declined: 'danger', Withdrawn: 'muted', Interviewing: 'info' };
 
-/* Proposals are grouped by job, because a bid only means anything next to the
-   other bids on the same job. */
 const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }) => {
   const [reading, setReading] = useState(null);
   const [hiring, setHiring] = useState(null);
   const [closingJob, setClosingJob] = useState(null);
 
   const pending = proposals.filter((p) => p.status === 'Pending');
-  const bids = pending.map((p) => p.amount);
-  const avgBid = bids.length ? Math.round(bids.reduce((a, b) => a + b, 0) / bids.length) : 0;
+  const bids = pending.map((p) => num(p.amount));
+  const avgBid = bids.length === 0 ? 0 : Math.round(bids.reduce((a, b) => a + b, 0) / bids.length);
 
   if (jobs.length === 0 && proposals.length === 0) {
     return (
@@ -50,10 +48,10 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
       </Row>
 
       {jobs.map((job) => {
-        const forJob = proposals.filter((p) => p.jobId === job.id);
+        const forJob = proposals.filter((p) => p.job_id === job.id);
         const openBids = forJob.filter((p) => p.status === 'Pending');
-        const cheapest = openBids.length ? Math.min(...openBids.map((p) => p.amount)) : null;
-        const fastest = openBids.length ? Math.min(...openBids.map((p) => p.days)) : null;
+        const cheapest = openBids.length === 0 ? null : Math.min(...openBids.map((p) => num(p.amount)));
+        const fastest = openBids.length === 0 ? null : Math.min(...openBids.map((p) => p.days));
 
         return (
           <div className="wm-panel wm-panel--flush mb-3" key={job.id}>
@@ -63,7 +61,7 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
                   {job.title}
                 </h5>
                 <p className="m-0 text-muted" style={{ fontSize: '0.82rem' }}>
-                  {money(job.budget)} budget &middot; {job.days} days &middot; posted {timeAgo(new Date(Date.now() - job.postedHours * 3600000).toISOString())}
+                  {money(job.budget)} budget &middot; {job.days} days &middot; posted {timeAgo(job.created_at)}
                 </p>
               </div>
               <div className="d-flex align-items-center gap-2">
@@ -91,21 +89,21 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
                     <tr key={p.id}>
                       <td>
                         <div className="d-flex align-items-center gap-2">
-                          <Avatar name={p.freelancer.name} size={34} />
+                          <Avatar name={p.freelancer_name} size={34} />
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{p.freelancer.name}</div>
+                            <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{p.freelancer_name}</div>
                             <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                              <Icon name="star" size={11} /> {p.freelancer.rating} &middot; {p.freelancer.jobs} orders
+                              <Icon name="star" size={11} /> {p.rating} &middot; {p.freelancer_title}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td>
                         <span className="wm-num">{money(p.amount)}</span>
-                        {p.amount === cheapest && p.status === 'Pending' && (
+                        {num(p.amount) === cheapest && p.status === 'Pending' && (
                           <div><Pill tone="success">Lowest bid</Pill></div>
                         )}
-                        {p.amount > job.budget && (
+                        {num(p.amount) > num(job.budget) && (
                           <div><Pill tone="warn">Over budget</Pill></div>
                         )}
                       </td>
@@ -115,7 +113,7 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
                           <div><Pill tone="info">Fastest</Pill></div>
                         )}
                       </td>
-                      <td className="text-muted" style={{ fontSize: '0.85rem' }}>{timeAgo(p.sentAt)}</td>
+                      <td className="text-muted" style={{ fontSize: '0.85rem' }}>{timeAgo(p.sent_at)}</td>
                       <td><Pill tone={STATUS_TONE[p.status]}>{p.status}</Pill></td>
                       <td className="text-end">
                         <Button size="sm" variant="link" className="p-0 me-3" onClick={() => setReading(p)}>Read</Button>
@@ -137,8 +135,7 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
         );
       })}
 
-      {/* proposals whose job has already been closed or filled */}
-      {proposals.filter((p) => !jobs.some((j) => j.id === p.jobId)).length > 0 && (
+      {proposals.filter((p) => !jobs.some((job) => job.id === p.job_id)).length > 0 && (
         <div className="wm-panel wm-panel--flush">
           <div className="wm-panel__head">
             <h5 className="m-0" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>Settled</h5>
@@ -146,11 +143,11 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
           </div>
           <Table hover responsive className="align-middle">
             <tbody>
-              {proposals.filter((p) => !jobs.some((j) => j.id === p.jobId)).map((p) => (
+              {proposals.filter((p) => !jobs.some((job) => job.id === p.job_id)).map((p) => (
                 <tr key={p.id}>
                   <td>
-                    <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{p.freelancer.name}</div>
-                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>{p.job}</div>
+                    <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{p.freelancer_name}</div>
+                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>{p.job_title}</div>
                   </td>
                   <td className="wm-num">{money(p.amount)}</td>
                   <td><Pill tone={STATUS_TONE[p.status]}>{p.status}</Pill></td>
@@ -164,15 +161,14 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
         </div>
       )}
 
-      {/* ---------- read the pitch ---------- */}
       <Modal show={Boolean(reading)} onHide={() => setReading(null)} centered>
         {reading && (
           <>
             <Modal.Header closeButton>
               <div>
-                <Modal.Title style={{ fontSize: '1.02rem' }}>{reading.freelancer.name}</Modal.Title>
+                <Modal.Title style={{ fontSize: '1.02rem' }}>{reading.freelancer_name}</Modal.Title>
                 <div className="text-muted" style={{ fontSize: '0.82rem' }}>
-                  {reading.freelancer.title} &middot; applied {timeAgo(reading.sentAt)}
+                  {reading.freelancer_title} &middot; applied {timeAgo(reading.sent_at)}
                 </div>
               </div>
             </Modal.Header>
@@ -188,39 +184,25 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
                 </Col>
                 <Col xs={4}>
                   <div className="wm-eyebrow">Rating</div>
-                  <div className="wm-num">{reading.freelancer.rating}</div>
+                  <div className="wm-num">{reading.rating}</div>
                 </Col>
               </Row>
 
-              {reading.freelancer.skills && (
+              {reading.skills && (
                 <div className="wm-chips mb-3">
-                  {reading.freelancer.skills.map((s) => <span className="wm-tag" key={s}>{s}</span>)}
+                  {reading.skills.map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
                 </div>
               )}
 
               <div className="wm-eyebrow">Their pitch</div>
               <p style={{ fontSize: '0.9rem', lineHeight: 1.65 }}>{reading.cover}</p>
 
-              {reading.plan && reading.plan.length > 0 && (
-                <>
-                  <div className="wm-eyebrow mt-3">Proposed milestones</div>
-                  {reading.plan.map((row, i) => (
-                    <div key={i} className="d-flex justify-content-between py-2 border-bottom" style={{ fontSize: '0.88rem' }}>
-                      <span>{row.title || `Milestone ${i + 1}`}</span>
-                      <span className="wm-num">{money(row.amount)}</span>
-                    </div>
-                  ))}
-                  <p className="text-muted mt-2 mb-0" style={{ fontSize: '0.8rem' }}>
-                    You approve and release each one separately.
-                  </p>
-                </>
-              )}
             </Modal.Body>
             <Modal.Footer>
               <Button variant="outline-secondary" onClick={() => setReading(null)}>Close</Button>
               {reading.status === 'Pending' && (
                 <Button variant="primary" onClick={() => { setHiring(reading); setReading(null); }}>
-                  Hire {reading.freelancer.name.split(' ')[0]}
+                  Hire {reading.freelancer_name.split(' ')[0]}
                 </Button>
               )}
             </Modal.Footer>
@@ -228,12 +210,11 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
         )}
       </Modal>
 
-      {/* ---------- funding confirmation ---------- */}
       <Modal show={Boolean(hiring)} onHide={() => setHiring(null)} centered>
         {hiring && (
           <>
             <Modal.Header closeButton>
-              <Modal.Title>Hire {hiring.freelancer.name}?</Modal.Title>
+              <Modal.Title>Hire {hiring.freelancer_name}?</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               <p style={{ fontSize: '0.9rem' }}>
@@ -247,7 +228,7 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
                 </div>
                 <div className="d-flex justify-content-between py-1" style={{ fontSize: '0.87rem' }}>
                   <span className="text-muted">Escrow fee ({CLIENT_FEE_RATE * 100}%)</span>
-                  <span className="wm-num">+{money(Math.round(hiring.amount * CLIENT_FEE_RATE))}</span>
+                  <span className="wm-num">+{money(Math.round(num(hiring.amount) * CLIENT_FEE_RATE))}</span>
                 </div>
                 <div className="d-flex justify-content-between py-1 border-top mt-1 pt-2" style={{ fontSize: '0.9rem' }}>
                   <span style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>Charged today</span>
@@ -266,7 +247,6 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
         )}
       </Modal>
 
-      {/* ---------- close a job ---------- */}
       <Modal show={Boolean(closingJob)} onHide={() => setClosingJob(null)} centered size="sm">
         {closingJob && (
           <Modal.Body className="text-center p-4">

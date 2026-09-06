@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Table, Button, Form, InputGroup } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, Avatar, EmptyState, EscrowBar } from '../../../components/Shared';
 import {
-  money, shortDate, deadlineLabel, deadlineTone,
+  money, shortDate, deadlineLabel, deadlineTone, orderRef,
   orderStatus, orderTotal, orderReleased, orderProgress, unreadCount, needsAttention, byUrgency,
-} from '../../../data/freelancerData';
+} from '../../../data/helpers';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -26,26 +26,32 @@ const OrdersTable = ({ orders, onOpen }) => {
     return needsAttention(order);
   };
 
+  const matchesSearch = (order) => {
+    const term = search.toLowerCase();
+    return (
+      order.project.toLowerCase().includes(term) ||
+      order.client.toLowerCase().includes(term) ||
+      orderRef(order).toLowerCase().includes(term)
+    );
+  };
+
   const visible = orders
     .filter(matchesFilter)
-    .filter((o) => {
-      const q = search.toLowerCase();
-      return o.project.toLowerCase().includes(q) || o.client.toLowerCase().includes(q) || (o.ref || '').toLowerCase().includes(q);
-    })
+    .filter(matchesSearch)
     .sort(byUrgency('freelancer'));
 
   return (
     <div className="wm-panel wm-panel--flush">
       <div className="wm-panel__head d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div className="wm-chips">
-          {FILTERS.map((f) => (
+          {FILTERS.map((item) => (
             <button
-              key={f.key}
+              key={item.key}
               type="button"
-              className={`wm-chip ${filter === f.key ? 'active' : ''}`}
-              onClick={() => setFilter(f.key)}
+              className={`wm-chip ${filter === item.key ? 'active' : ''}`}
+              onClick={() => setFilter(item.key)}
             >
-              {f.label}
+              {item.label}
             </button>
           ))}
         </div>
@@ -83,7 +89,8 @@ const OrdersTable = ({ orders, onOpen }) => {
           <tbody>
             {visible.map((order) => {
               const status = orderStatus(order);
-              const unread = unreadCount(order);
+              const unread = unreadCount(order, 'freelancer');
+
               return (
                 <tr key={order.id} style={{ cursor: 'pointer' }} onClick={() => onOpen(order.id)}>
                   <td>
@@ -92,8 +99,10 @@ const OrdersTable = ({ orders, onOpen }) => {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{order.project}</div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                          {order.ref} &middot; {order.client}
-                          {unread > 0 && <span style={{ color: 'var(--mint-deep)', fontWeight: 600 }}> &middot; {unread} new</span>}
+                          {orderRef(order)} &middot; {order.client}
+                          {unread > 0 && (
+                            <span style={{ color: 'var(--mint-deep)', fontWeight: 600 }}> &middot; {unread} new</span>
+                          )}
                         </div>
                       </div>
                     </div>

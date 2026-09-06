@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Table, Button, Form, InputGroup, Row, Col } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, StatCard, EmptyState } from '../../../components/Shared';
-import { money, timeAgo, DISPUTE_STATUS } from '../../../data/freelancerData';
+import { money, num, timeAgo, orderRef, DISPUTE_STATUS } from '../../../data/helpers';
 
 const FILTERS = ['All', 'Open', 'Under review', 'Resolved'];
 
@@ -10,34 +10,33 @@ const DisputesList = ({ disputes, orders, onReview, onTriage }) => {
   const [filter, setFilter] = useState('Open');
   const [search, setSearch] = useState('');
 
-  const open = disputes.filter((d) => d.status !== 'Resolved');
-  const frozen = open.reduce((sum, d) => sum + d.amount, 0);
-  const resolved = disputes.filter((d) => d.status === 'Resolved');
+  const open = disputes.filter((dispute) => dispute.status !== 'Resolved');
+  const frozen = open.reduce((sum, dispute) => sum + num(dispute.amount), 0);
+  const resolved = disputes.filter((dispute) => dispute.status === 'Resolved');
 
-  /* How long the oldest unresolved case has been sitting there. */
-  const oldest = open.length
-    ? Math.max(...open.map((d) => Date.now() - new Date(d.openedAt).getTime()))
-    : 0;
+  const oldest = open.length === 0
+    ? 0
+    : Math.max(...open.map((dispute) => Date.now() - new Date(dispute.opened_at).getTime()));
   const oldestDays = Math.floor(oldest / 86400000);
 
   const visible = disputes
-    .filter((d) => filter === 'All' || d.status === filter)
-    .filter((d) => {
-      const q = search.toLowerCase();
+    .filter((dispute) => filter === 'All' || dispute.status === filter)
+    .filter((dispute) => {
+      const term = search.toLowerCase();
       return (
-        String(d.id).includes(q) ||
-        d.client.toLowerCase().includes(q) ||
-        d.freelancer.toLowerCase().includes(q) ||
-        d.project.toLowerCase().includes(q)
+        String(dispute.id).includes(term) ||
+        dispute.client.toLowerCase().includes(term) ||
+        dispute.freelancer.toLowerCase().includes(term) ||
+        dispute.project.toLowerCase().includes(term)
       );
     })
-    .sort((a, b) => new Date(a.openedAt) - new Date(b.openedAt)); // oldest first: they age badly
+    .sort((a, b) => new Date(a.opened_at) - new Date(b.opened_at));
 
   return (
     <>
       <Row className="g-3 mb-4">
         <Col sm={4}>
-          <StatCard label="Open cases" value={open.length} icon="alert" tone={open.length ? 'danger' : 'muted'} sub="Awaiting mediation" />
+          <StatCard label="Open cases" value={open.length} icon="alert" tone={open.length > 0 ? 'danger' : 'muted'} sub="Awaiting mediation" />
         </Col>
         <Col sm={4}>
           <StatCard label="Frozen escrow" value={money(frozen)} icon="lock" tone="warn" sub="Cannot move until resolved" />
@@ -45,7 +44,7 @@ const DisputesList = ({ disputes, orders, onReview, onTriage }) => {
         <Col sm={4}>
           <StatCard
             label="Oldest open case" icon="clock" tone={oldestDays > 3 ? 'danger' : 'muted'}
-            value={open.length ? `${oldestDays}d` : '-'}
+            value={open.length > 0 ? `${oldestDays}d` : '-'}
             sub={`${resolved.length} resolved all time`}
           />
         </Col>
@@ -54,11 +53,16 @@ const DisputesList = ({ disputes, orders, onReview, onTriage }) => {
       <div className="wm-panel wm-panel--flush">
         <div className="wm-panel__head d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div className="wm-chips">
-            {FILTERS.map((f) => (
-              <button key={f} type="button" className={`wm-chip ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
-                {f}
+            {FILTERS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={`wm-chip ${filter === item ? 'active' : ''}`}
+                onClick={() => setFilter(item)}
+              >
+                {item}
                 <span className="wm-chip__count">
-                  {f === 'All' ? disputes.length : disputes.filter((d) => d.status === f).length}
+                  {item === 'All' ? disputes.length : disputes.filter((dispute) => dispute.status === item).length}
                 </span>
               </button>
             ))}
@@ -96,25 +100,25 @@ const DisputesList = ({ disputes, orders, onReview, onTriage }) => {
             </thead>
             <tbody>
               {visible.map((dispute) => {
-                const order = orders.find((o) => o.id === dispute.orderId);
+                const order = orders.find((item) => item.id === dispute.order_id);
                 return (
                   <tr key={dispute.id}>
                     <td>
-                      <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{dispute.id}</div>
+                      <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>Case {dispute.id}</div>
                       <div className="text-muted" style={{ fontSize: '0.78rem' }}>{dispute.reason}</div>
                     </td>
                     <td>
                       <div style={{ fontSize: '0.85rem' }}>{dispute.client}</div>
                       <div className="text-muted" style={{ fontSize: '0.78rem' }}>vs {dispute.freelancer}</div>
-                      <Pill tone="muted">raised by the {dispute.raisedBy}</Pill>
+                      <Pill tone="muted">raised by the {dispute.raised_by}</Pill>
                     </td>
                     <td>
                       <span className="wm-num">{money(dispute.amount)}</span>
                       {order && (
-                        <div className="text-muted" style={{ fontSize: '0.76rem' }}>{order.ref}</div>
+                        <div className="text-muted" style={{ fontSize: '0.76rem' }}>{orderRef(order)}</div>
                       )}
                     </td>
-                    <td className="text-muted" style={{ fontSize: '0.84rem' }}>{timeAgo(dispute.openedAt)}</td>
+                    <td className="text-muted" style={{ fontSize: '0.84rem' }}>{timeAgo(dispute.opened_at)}</td>
                     <td>
                       <Pill tone={DISPUTE_STATUS[dispute.status].tone}>{dispute.status}</Pill>
                       {dispute.resolution && (

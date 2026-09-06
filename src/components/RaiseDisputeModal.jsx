@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Modal, Form, Button, Alert } from 'react-bootstrap';
-import { money, canDispute, MILESTONE_STATUS } from '../data/freelancerData';
+import { money, canDispute, MILESTONE_STATUS, milestonesOf } from '../data/helpers';
 
 const REASONS = {
   client: [
@@ -17,8 +17,6 @@ const REASONS = {
   ],
 };
 
-/* Used by both workspaces. Raising a dispute freezes the milestone until an
-   admin resolves it, so the form makes that consequence explicit. */
 const RaiseDisputeModal = ({ show, onHide, order, role, onSubmit }) => {
   const [milestoneId, setMilestoneId] = useState('');
   const [reason, setReason] = useState('');
@@ -27,18 +25,26 @@ const RaiseDisputeModal = ({ show, onHide, order, role, onSubmit }) => {
 
   if (!order) return null;
 
-  const eligible = order.milestones.filter(canDispute);
-  const selected = eligible.find((m) => m.id === milestoneId) || eligible[0];
+  const eligible = milestonesOf(order).filter(canDispute);
+  const selected = eligible.find((m) => m.id === Number(milestoneId)) || eligible[0];
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!selected) return;
-    if (!reason) return setError('Pick the closest reason.');
-    if (detail.trim().length < 30) {
-      return setError('Give the mediator enough detail to judge it. At least a couple of sentences.');
+
+    if (!reason) {
+      setError('Pick the closest reason.');
+      return;
     }
+    if (detail.trim().length < 30) {
+      setError('Give the mediator enough detail to judge it. At least a couple of sentences.');
+      return;
+    }
+
     onSubmit(order.id, selected.id, role, { reason, detail: detail.trim() });
-    setReason(''); setDetail(''); setError('');
+    setReason('');
+    setDetail('');
+    setError('');
     onHide();
   };
 
@@ -65,10 +71,13 @@ const RaiseDisputeModal = ({ show, onHide, order, role, onSubmit }) => {
 
               <Form.Group className="mb-3">
                 <Form.Label>Which milestone?</Form.Label>
-                <Form.Select value={selected ? selected.id : ''} onChange={(e) => setMilestoneId(e.target.value)}>
-                  {eligible.map((m) => (
-                    <option value={m.id} key={m.id}>
-                      {m.title} - {money(m.amount)} ({MILESTONE_STATUS[m.status].label})
+                <Form.Select
+                  value={selected ? selected.id : ''}
+                  onChange={(e) => setMilestoneId(e.target.value)}
+                >
+                  {eligible.map((milestone) => (
+                    <option value={milestone.id} key={milestone.id}>
+                      {milestone.title} - {money(milestone.amount)} ({MILESTONE_STATUS[milestone.status].label})
                     </option>
                   ))}
                 </Form.Select>
@@ -76,9 +85,12 @@ const RaiseDisputeModal = ({ show, onHide, order, role, onSubmit }) => {
 
               <Form.Group className="mb-3">
                 <Form.Label>Reason</Form.Label>
-                <Form.Select value={reason} onChange={(e) => { setReason(e.target.value); setError(''); }}>
+                <Form.Select
+                  value={reason}
+                  onChange={(e) => { setReason(e.target.value); setError(''); }}
+                >
                   <option value="">Choose one...</option>
-                  {REASONS[role].map((r) => <option value={r} key={r}>{r}</option>)}
+                  {REASONS[role].map((item) => <option value={item} key={item}>{item}</option>)}
                 </Form.Select>
               </Form.Group>
 

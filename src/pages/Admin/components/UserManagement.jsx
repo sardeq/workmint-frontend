@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Table, Button, Form, InputGroup, Modal, Alert, Row, Col } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, StatCard, EmptyState, Avatar } from '../../../components/Shared';
-import { money, shortDate, timeAgo, orderReleased } from '../../../data/freelancerData';
+import { money, shortDate, orderReleased } from '../../../data/helpers';
 
 const STATUS_TONE = { active: 'success', pending: 'warn', suspended: 'danger' };
 const ROLES = ['All', 'client', 'freelancer', 'admin'];
@@ -14,35 +14,37 @@ const UserManagement = ({ users, orders, onSetStatus }) => {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
-  /* What each account is actually worth to the platform, from live orders. */
-  const volumeFor = (user) => {
-    if (user.role === 'client') {
+  const volumeFor = (person) => {
+    if (person.role === 'client') {
       return orders
-        .filter((o) => o.client === user.company)
-        .reduce((sum, o) => sum + orderReleased(o), 0);
+        .filter((order) => order.client_id === person.id)
+        .reduce((sum, order) => sum + orderReleased(order), 0);
     }
-    if (user.role === 'freelancer') {
+    if (person.role === 'freelancer') {
       return orders
-        .filter((o) => o.freelancer && o.freelancer.name === user.name)
-        .reduce((sum, o) => sum + orderReleased(o), 0);
+        .filter((order) => order.freelancer_id === person.id)
+        .reduce((sum, order) => sum + orderReleased(order), 0);
     }
     return 0;
   };
 
   const visible = users
-    .filter((u) => role === 'All' || u.role === role)
-    .filter((u) => {
-      const q = search.toLowerCase();
+    .filter((person) => role === 'All' || person.role === role)
+    .filter((person) => {
+      const term = search.toLowerCase();
       return (
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        (u.company || '').toLowerCase().includes(q)
+        person.name.toLowerCase().includes(term) ||
+        person.email.toLowerCase().includes(term) ||
+        (person.company || '').toLowerCase().includes(term)
       );
     });
 
   const confirmSuspend = (e) => {
     e.preventDefault();
-    if (reason.trim().length < 10) return setError('Record why. This shows on the account.');
+    if (reason.trim().length < 10) {
+      setError('Record why. This shows on the account.');
+      return;
+    }
     onSetStatus(suspending.id, 'suspended', reason.trim());
     setSuspending(null);
     setReason('');
@@ -56,24 +58,29 @@ const UserManagement = ({ users, orders, onSetStatus }) => {
           <StatCard label="Accounts" value={users.length} icon="user" tone="info" sub="All roles" />
         </Col>
         <Col sm={3}>
-          <StatCard label="Active" value={users.filter((u) => u.status === 'active').length} icon="check" tone="success" sub="Can sign in" />
+          <StatCard label="Active" value={users.filter((person) => person.status === 'active').length} icon="check" tone="success" sub="Can sign in" />
         </Col>
         <Col sm={3}>
-          <StatCard label="Pending" value={users.filter((u) => u.status === 'pending').length} icon="clock" tone="warn" sub="Awaiting screening" />
+          <StatCard label="Pending" value={users.filter((person) => person.status === 'pending').length} icon="clock" tone="warn" sub="Awaiting screening" />
         </Col>
         <Col sm={3}>
-          <StatCard label="Suspended" value={users.filter((u) => u.status === 'suspended').length} icon="alert" tone="danger" sub="Blocked from signing in" />
+          <StatCard label="Suspended" value={users.filter((person) => person.status === 'suspended').length} icon="alert" tone="danger" sub="Blocked from signing in" />
         </Col>
       </Row>
 
       <div className="wm-panel wm-panel--flush">
         <div className="wm-panel__head d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div className="wm-chips">
-            {ROLES.map((r) => (
-              <button key={r} type="button" className={`wm-chip ${role === r ? 'active' : ''}`} onClick={() => setRole(r)}>
-                {r === 'All' ? 'All' : `${r.charAt(0).toUpperCase()}${r.slice(1)}s`}
+            {ROLES.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={`wm-chip ${role === item ? 'active' : ''}`}
+                onClick={() => setRole(item)}
+              >
+                {item === 'All' ? 'All' : `${item.charAt(0).toUpperCase()}${item.slice(1)}s`}
                 <span className="wm-chip__count">
-                  {r === 'All' ? users.length : users.filter((u) => u.role === r).length}
+                  {item === 'All' ? users.length : users.filter((person) => person.role === item).length}
                 </span>
               </button>
             ))}
@@ -106,47 +113,50 @@ const UserManagement = ({ users, orders, onSetStatus }) => {
               </tr>
             </thead>
             <tbody>
-              {visible.map((user) => (
-                <tr key={user.id}>
+              {visible.map((person) => (
+                <tr key={person.id}>
                   <td>
                     <div className="d-flex align-items-center gap-2">
-                      <Avatar name={user.name} size={34} tone={user.role === 'client' ? 'slate' : 'mint'} />
+                      <Avatar name={person.name} size={34} tone={person.role === 'client' ? 'slate' : 'mint'} />
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{user.name}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{person.name}</div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                          {user.email}{user.company ? ` - ${user.company}` : ''}
+                          {person.email}{person.company ? ` - ${person.company}` : ''}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ textTransform: 'capitalize', fontSize: '0.86rem' }}>{user.role}</td>
+                  <td style={{ textTransform: 'capitalize', fontSize: '0.86rem' }}>{person.role}</td>
                   <td>
                     <span className="wm-num" style={{ fontSize: '0.9rem' }}>
-                      {user.role === 'admin' ? '-' : money(volumeFor(user))}
+                      {person.role === 'admin' ? '-' : money(volumeFor(person))}
                     </span>
                   </td>
                   <td className="text-muted" style={{ fontSize: '0.83rem' }}>
-                    {shortDate(user.joinedAt)}
-                    <div style={{ fontSize: '0.74rem' }}>seen {timeAgo(user.lastActive)}</div>
+                    {shortDate(person.joined_at)}
                   </td>
                   <td>
-                    <Pill tone={STATUS_TONE[user.status]}>{user.status}</Pill>
-                    {user.suspendedReason && (
+                    <Pill tone={STATUS_TONE[person.status]}>{person.status}</Pill>
+                    {person.suspended_reason && (
                       <div className="text-muted mt-1" style={{ fontSize: '0.74rem', maxWidth: 180 }}>
-                        {user.suspendedReason}
+                        {person.suspended_reason}
                       </div>
                     )}
                   </td>
                   <td className="text-end">
-                    {user.role === 'admin' ? (
+                    {person.role === 'admin' ? (
                       <span className="text-muted" style={{ fontSize: '0.82rem' }}>Protected</span>
-                    ) : user.status === 'active' ? (
-                      <Button size="sm" variant="outline-secondary" onClick={() => { setSuspending(user); setReason(''); setError(''); }}>
+                    ) : person.status === 'active' ? (
+                      <Button
+                        size="sm"
+                        variant="outline-secondary"
+                        onClick={() => { setSuspending(person); setReason(''); setError(''); }}
+                      >
                         Suspend
                       </Button>
                     ) : (
-                      <Button size="sm" variant="primary" onClick={() => onSetStatus(user.id, 'active')}>
-                        {user.status === 'pending' ? 'Approve' : 'Reinstate'}
+                      <Button size="sm" variant="primary" onClick={() => onSetStatus(person.id, 'active')}>
+                        {person.status === 'pending' ? 'Approve' : 'Reinstate'}
                       </Button>
                     )}
                   </td>

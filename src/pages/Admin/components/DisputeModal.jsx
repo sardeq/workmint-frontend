@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert, Row, Col } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill } from '../../../components/Shared';
 import {
-  money, netOf, timeAgo, shortDate, DISPUTE_OUTCOMES, DISPUTE_STATUS, MILESTONE_STATUS,
-} from '../../../data/freelancerData';
+  money, num, netOf, timeAgo, shortDate, milestonesOf, messagesOf,
+  DISPUTE_OUTCOMES, DISPUTE_STATUS, MILESTONE_STATUS,
+} from '../../../data/helpers';
 
-/* Mediation needs the evidence in front of you, not just the claim: the
-   milestone, what was delivered, and the last few messages between them. */
 const DisputeModal = ({ show, dispute, order, onHide, onResolve }) => {
   const [outcome, setOutcome] = useState('');
   const [note, setNote] = useState('');
@@ -21,21 +20,29 @@ const DisputeModal = ({ show, dispute, order, onHide, onResolve }) => {
 
   if (!dispute) return null;
 
-  const milestone = order ? order.milestones.find((m) => m.id === dispute.milestoneId) : null;
+  const milestone = order ? milestonesOf(order).find((item) => item.id === dispute.milestone_id) : null;
   const settled = dispute.status === 'Resolved';
-  const half = Math.round(dispute.amount / 2);
+  const amount = num(dispute.amount);
+  const half = Math.round(amount / 2);
+  const freelancerName = order ? order.freelancer_name : 'Freelancer';
 
   const handleResolve = (e) => {
     e.preventDefault();
-    if (!outcome) return setError('Pick an outcome.');
-    if (note.trim().length < 20) return setError('Write the reasoning. Both sides see this on the case.');
+    if (!outcome) {
+      setError('Pick an outcome.');
+      return;
+    }
+    if (note.trim().length < 20) {
+      setError('Write the reasoning. Both sides see this on the case.');
+      return;
+    }
     onResolve(dispute.id, outcome, note.trim());
   };
 
   const preview = {
-    release: [`${order ? order.freelancer.name : 'Freelancer'} receives ${money(netOf(dispute.amount))}`, `${money(dispute.amount)} leaves escrow`],
-    refund: [`${dispute.client} gets ${money(dispute.amount)} back`, 'The milestone is cancelled'],
-    split: [`${order ? order.freelancer.name : 'Freelancer'} receives ${money(netOf(dispute.amount - half))}`, `${dispute.client} gets ${money(half)} back`],
+    release: [`${freelancerName} receives ${money(netOf(amount))}`, `${money(amount)} leaves escrow`],
+    refund: [`${dispute.client} gets ${money(amount)} back`, 'The milestone is cancelled'],
+    split: [`${freelancerName} receives ${money(netOf(amount - half))}`, `${dispute.client} gets ${money(half)} back`],
   };
 
   return (
@@ -44,7 +51,7 @@ const DisputeModal = ({ show, dispute, order, onHide, onResolve }) => {
         <div>
           <Modal.Title style={{ fontSize: '1.05rem' }}>Case {dispute.id}</Modal.Title>
           <div className="text-muted" style={{ fontSize: '0.83rem' }}>
-            {dispute.project} &middot; opened {timeAgo(dispute.openedAt)} by the {dispute.raisedBy}
+            {dispute.project} &middot; opened {timeAgo(dispute.opened_at)} by the {dispute.raised_by}
           </div>
         </div>
       </Modal.Header>
@@ -53,7 +60,7 @@ const DisputeModal = ({ show, dispute, order, onHide, onResolve }) => {
         <Row className="g-2 mb-3">
           <Col xs={4}>
             <div className="wm-eyebrow">Frozen</div>
-            <div className="wm-num" style={{ fontSize: '1.15rem', color: 'var(--amber)' }}>{money(dispute.amount)}</div>
+            <div className="wm-num" style={{ fontSize: '1.15rem', color: 'var(--amber)' }}>{money(amount)}</div>
           </Col>
           <Col xs={4}>
             <div className="wm-eyebrow">Milestone</div>
@@ -69,37 +76,37 @@ const DisputeModal = ({ show, dispute, order, onHide, onResolve }) => {
         </Row>
 
         <div className="wm-note wm-note--danger">
-          <strong>{dispute.raisedBy === 'client' ? dispute.client : dispute.freelancer} claims</strong>
+          <strong>{dispute.raised_by === 'client' ? dispute.client : dispute.freelancer} claims</strong>
           <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{dispute.reason}</div>
           <div className="mt-1">{dispute.detail}</div>
         </div>
 
-        {milestone && milestone.deliverable && (
+        {milestone && milestone.deliverable_link && (
           <div className="wm-note wm-note--muted">
-            <strong>What was delivered {timeAgo(milestone.deliverable.at)}</strong>
-            <a href={milestone.deliverable.link} target="_blank" rel="noreferrer" className="text-decoration-none">
-              {milestone.deliverable.link} <Icon name="external" size={12} />
+            <strong>What was delivered {timeAgo(milestone.delivered_at)}</strong>
+            <a href={milestone.deliverable_link} target="_blank" rel="noreferrer" className="text-decoration-none">
+              {milestone.deliverable_link} <Icon name="external" size={12} />
             </a>
-            {milestone.deliverable.note && <div className="text-muted mt-1">{milestone.deliverable.note}</div>}
+            {milestone.deliverable_note && <div className="text-muted mt-1">{milestone.deliverable_note}</div>}
           </div>
         )}
 
-        {milestone && milestone.revisionNote && (
+        {milestone && milestone.revision_note && (
           <div className="wm-note wm-note--muted">
             <strong>Revision the client asked for</strong>
-            {milestone.revisionNote}
+            {milestone.revision_note}
           </div>
         )}
 
-        {order && order.messages.length > 0 && (
+        {order && messagesOf(order).length > 0 && (
           <>
             <div className="wm-eyebrow mt-3 mb-2">Last messages between them</div>
             <div className="wm-chat" style={{ maxHeight: 190 }}>
-              {order.messages.slice(-4).map((m) => (
-                <div key={m.id} className={`wm-bubble wm-bubble--${m.from === 'client' ? 'client' : 'you'}`}>
-                  {m.text}
+              {messagesOf(order).slice(-4).map((item) => (
+                <div key={item.id} className={`wm-bubble wm-bubble--${item.sender_role === 'client' ? 'client' : 'you'}`}>
+                  {item.body}
                   <div className="wm-bubble__meta">
-                    {m.from === 'client' ? order.client : order.freelancer.name} &middot; {timeAgo(m.at)}
+                    {item.sender_role === 'client' ? order.client : order.freelancer_name} &middot; {timeAgo(item.sent_at)}
                   </div>
                 </div>
               ))}
@@ -109,11 +116,13 @@ const DisputeModal = ({ show, dispute, order, onHide, onResolve }) => {
 
         {settled ? (
           <Alert variant="light" className="border mt-3 mb-0">
-            <div className="wm-eyebrow mb-1">Resolved {dispute.resolvedAt ? shortDate(dispute.resolvedAt) : ''}</div>
+            <div className="wm-eyebrow mb-1">Resolved {dispute.resolved_at ? shortDate(dispute.resolved_at) : ''}</div>
             <div style={{ fontWeight: 600, color: 'var(--slate-dark)', fontSize: '0.92rem' }}>
-              {(DISPUTE_OUTCOMES.find((o) => o.key === dispute.resolution) || {}).label || dispute.resolution}
+              {(DISPUTE_OUTCOMES.find((item) => item.key === dispute.resolution) || {}).label || dispute.resolution}
             </div>
-            {dispute.resolutionNote && <div className="text-muted mt-1" style={{ fontSize: '0.87rem' }}>{dispute.resolutionNote}</div>}
+            {dispute.resolution_note && (
+              <div className="text-muted mt-1" style={{ fontSize: '0.87rem' }}>{dispute.resolution_note}</div>
+            )}
           </Alert>
         ) : (
           <Form onSubmit={handleResolve} className="mt-4">

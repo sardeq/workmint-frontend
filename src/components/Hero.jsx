@@ -1,6 +1,5 @@
-import React from 'react';
 import Icon from './Icon';
-import { money } from '../data/freelancerData';
+import { money } from '../data/helpers';
 
 const RECEIPT = {
   id: 'ORD-892',

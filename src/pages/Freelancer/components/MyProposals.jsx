@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Row, Col, Button, Modal, Table } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, StatCard, EmptyState } from '../../../components/Shared';
-import { money, timeAgo } from '../../../data/freelancerData';
+import { money, num, timeAgo } from '../../../data/helpers';
 
 const STATUS_TONE = {
   Pending: 'warn',
@@ -21,13 +21,14 @@ const MyProposals = ({ proposals, onWithdraw, onGo }) => {
   const decided = proposals.filter((p) => p.status === 'Accepted' || p.status === 'Declined');
   const won = proposals.filter((p) => p.status === 'Accepted').length;
   const winRate = decided.length === 0 ? null : Math.round((won / decided.length) * 100);
+
   const pipelineValue = proposals
     .filter((p) => p.status === 'Pending' || p.status === 'Interviewing')
-    .reduce((sum, p) => sum + p.amount, 0);
+    .reduce((sum, p) => sum + num(p.amount), 0);
 
   const visible = proposals
     .filter((p) => filter === 'All' || p.status === filter)
-    .sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
+    .sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
 
   if (proposals.length === 0) {
     return (
@@ -70,11 +71,16 @@ const MyProposals = ({ proposals, onWithdraw, onGo }) => {
       <div className="wm-panel wm-panel--flush">
         <div className="wm-panel__head">
           <div className="wm-chips">
-            {FILTERS.map((f) => (
-              <button key={f} type="button" className={`wm-chip ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
-                {f}
+            {FILTERS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={`wm-chip ${filter === item ? 'active' : ''}`}
+                onClick={() => setFilter(item)}
+              >
+                {item}
                 <span className="wm-chip__count">
-                  {f === 'All' ? proposals.length : proposals.filter((p) => p.status === f).length}
+                  {item === 'All' ? proposals.length : proposals.filter((p) => p.status === item).length}
                 </span>
               </button>
             ))}
@@ -96,22 +102,22 @@ const MyProposals = ({ proposals, onWithdraw, onGo }) => {
               </tr>
             </thead>
             <tbody>
-              {visible.map((p) => (
-                <tr key={p.id}>
+              {visible.map((proposal) => (
+                <tr key={proposal.id}>
                   <td>
-                    <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{p.job}</div>
-                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>{p.days} day delivery</div>
+                    <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{proposal.job_title}</div>
+                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>{proposal.days} day delivery</div>
                   </td>
-                  <td className="text-muted">{p.client}</td>
-                  <td className="wm-num">{money(p.amount)}</td>
-                  <td className="text-muted" style={{ fontSize: '0.85rem' }}>{timeAgo(p.sentAt)}</td>
-                  <td><Pill tone={STATUS_TONE[p.status]}>{p.status}</Pill></td>
+                  <td className="text-muted">{proposal.client}</td>
+                  <td className="wm-num">{money(proposal.amount)}</td>
+                  <td className="text-muted" style={{ fontSize: '0.85rem' }}>{timeAgo(proposal.sent_at)}</td>
+                  <td><Pill tone={STATUS_TONE[proposal.status]}>{proposal.status}</Pill></td>
                   <td className="text-end">
-                    <Button size="sm" variant="link" className="p-0 me-3" onClick={() => setReading(p)}>
+                    <Button size="sm" variant="link" className="p-0 me-3" onClick={() => setReading(proposal)}>
                       View
                     </Button>
-                    {(p.status === 'Pending' || p.status === 'Interviewing') && (
-                      <Button size="sm" variant="outline-secondary" onClick={() => onWithdraw(p.id)}>
+                    {(proposal.status === 'Pending' || proposal.status === 'Interviewing') && (
+                      <Button size="sm" variant="outline-secondary" onClick={() => onWithdraw(proposal.id)}>
                         Withdraw
                       </Button>
                     )}
@@ -128,9 +134,9 @@ const MyProposals = ({ proposals, onWithdraw, onGo }) => {
           <>
             <Modal.Header closeButton>
               <div>
-                <Modal.Title style={{ fontSize: '1.02rem' }}>{reading.job}</Modal.Title>
+                <Modal.Title style={{ fontSize: '1.02rem' }}>{reading.job_title}</Modal.Title>
                 <div className="text-muted" style={{ fontSize: '0.82rem' }}>
-                  {reading.client} &middot; sent {timeAgo(reading.sentAt)}
+                  {reading.client} &middot; sent {timeAgo(reading.sent_at)}
                 </div>
               </div>
             </Modal.Header>
@@ -152,26 +158,11 @@ const MyProposals = ({ proposals, onWithdraw, onGo }) => {
 
               <div className="wm-eyebrow">Your pitch</div>
               <p style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>{reading.cover}</p>
-
-              {reading.plan && reading.plan.length > 0 && (
-                <>
-                  <div className="wm-eyebrow mt-3">Proposed milestones</div>
-                  {reading.plan.map((row, i) => (
-                    <div key={i} className="d-flex justify-content-between py-2 border-bottom" style={{ fontSize: '0.88rem' }}>
-                      <span>{row.title || `Milestone ${i + 1}`}</span>
-                      <span className="wm-num">{money(row.amount)}</span>
-                    </div>
-                  ))}
-                </>
-              )}
             </Modal.Body>
             <Modal.Footer>
               <Button variant="outline-secondary" onClick={() => setReading(null)}>Close</Button>
               {(reading.status === 'Pending' || reading.status === 'Interviewing') && (
-                <Button
-                  variant="primary"
-                  onClick={() => { onWithdraw(reading.id); setReading(null); }}
-                >
+                <Button variant="primary" onClick={() => { onWithdraw(reading.id); setReading(null); }}>
                   <Icon name="trash" size={13} className="me-1" /> Withdraw proposal
                 </Button>
               )}

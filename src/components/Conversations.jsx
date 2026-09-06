@@ -1,31 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Row, Col, Form, Button } from 'react-bootstrap';
 import Icon from './Icon';
 import { Pill, Avatar, EmptyState } from './Shared';
-import { timeAgo, unreadCount, orderStatus } from '../data/freelancerData';
+import { timeAgo, unreadCount, orderStatus, orderRef, messagesOf } from '../data/helpers';
 
 const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
-  const other = (order) => (role === 'client' ? order.freelancer.name : order.client);
+  const other = (order) => (role === 'client' ? order.freelancer_name : order.client);
 
-  const sorted = [...orders].sort((a, b) => {
-    const last = (o) => (o.messages.length ? new Date(o.messages[o.messages.length - 1].at) : 0);
-    return last(b) - last(a);
-  });
+  const lastMessageTime = (order) => {
+    const messages = messagesOf(order);
+    if (messages.length === 0) return 0;
+    return new Date(messages[messages.length - 1].sent_at);
+  };
 
-  const [activeId, setActiveId] = useState(sorted.length ? sorted[0].id : null);
+  const sorted = [...orders].sort((a, b) => lastMessageTime(b) - lastMessageTime(a));
+
+  const [activeId, setActiveId] = useState(sorted.length > 0 ? sorted[0].id : null);
   const [text, setText] = useState('');
 
-  const active = orders.find((o) => o.id === activeId) || null;
+  const active = orders.find((order) => order.id === activeId) || null;
 
   useEffect(() => {
     if (activeId) onRead(activeId, role);
   }, [activeId]);
 
   useEffect(() => {
-    // Scroll the newest message into view (plain DOM, no ref needed).
     const node = document.getElementById('conversations-chat-end');
     if (node) node.scrollIntoView({ block: 'nearest' });
-  }, [activeId, active ? active.messages.length : 0]);
+  }, [activeId, active ? messagesOf(active).length : 0]);
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -54,8 +56,10 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
         <Col lg={4}>
           <div className="wm-thread-list">
             {sorted.map((order) => {
-              const last = order.messages[order.messages.length - 1];
+              const messages = messagesOf(order);
+              const last = messages[messages.length - 1];
               const unread = unreadCount(order, role);
+
               return (
                 <button
                   key={order.id}
@@ -68,10 +72,10 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
                     <div className="d-flex justify-content-between align-items-center">
                       <span className="wm-thread__name">{other(order)}</span>
                       <span className="text-muted" style={{ fontSize: '0.72rem' }}>
-                        {last ? timeAgo(last.at) : ''}
+                        {last ? timeAgo(last.sent_at) : ''}
                       </span>
                     </div>
-                    <div className="wm-thread__preview">{last ? last.text : 'No messages yet'}</div>
+                    <div className="wm-thread__preview">{last ? last.body : 'No messages yet'}</div>
                     <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>{order.project}</div>
                   </div>
                   {unread > 0 && <span className="wm-thread__dot" />}
@@ -88,7 +92,7 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
                 <div>
                   <div style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>{other(active)}</div>
                   <div className="text-muted" style={{ fontSize: '0.8rem' }}>
-                    {active.project} &middot; {active.ref}
+                    {active.project} &middot; {orderRef(active)}
                   </div>
                 </div>
                 <div className="d-flex align-items-center gap-2">
@@ -100,15 +104,18 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
               </div>
 
               <div className="wm-panel__body">
-                {active.messages.length === 0 ? (
+                {messagesOf(active).length === 0 ? (
                   <EmptyState icon="chat" title="Start the conversation" body={`Say hello to ${other(active)}.`} />
                 ) : (
                   <div className="wm-chat">
-                    {active.messages.map((m) => (
-                      <div key={m.id} className={`wm-bubble wm-bubble--${m.from === role ? 'you' : 'client'}`}>
-                        {m.text}
+                    {messagesOf(active).map((message) => (
+                      <div
+                        key={message.id}
+                        className={`wm-bubble wm-bubble--${message.sender_role === role ? 'you' : 'client'}`}
+                      >
+                        {message.body}
                         <div className="wm-bubble__meta">
-                          {m.from === role ? 'You' : other(active)} &middot; {timeAgo(m.at)}
+                          {message.sender_role === role ? 'You' : other(active)} &middot; {timeAgo(message.sent_at)}
                         </div>
                       </div>
                     ))}

@@ -1,21 +1,20 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Row, Col, Form, InputGroup, Button, Modal } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, EmptyState, Avatar } from '../../../components/Shared';
 import ProposalModal from './ProposalModal';
-import { money, timeAgo, hoursAgo } from '../../../data/freelancerData';
+import { money, num, timeAgo } from '../../../data/helpers';
 
 const LEVEL_TONE = { Entry: 'muted', Intermediate: 'info', Expert: 'success' };
 
 const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) => {
   const [search, setSearch] = useState('');
-  const [skill, setSkill] = useState('All');
+  const [skillFilter, setSkillFilter] = useState('All');
   const [sort, setSort] = useState('newest');
   const [savedOnly, setSavedOnly] = useState(false);
   const [detail, setDetail] = useState(null);
   const [applyingTo, setApplyingTo] = useState(null);
 
-  // Skills are derived from the listings, so the filter never goes out of date.
   const skills = ['All'];
   jobs.forEach((job) => {
     job.skills.forEach((skill) => {
@@ -23,23 +22,25 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
     });
   });
 
-  const appliedIds = proposals.filter((p) => p.status !== 'Withdrawn').map((p) => p.jobId);
+  const appliedIds = proposals
+    .filter((proposal) => proposal.status !== 'Withdrawn')
+    .map((proposal) => proposal.job_id);
 
   const visible = jobs
     .filter((job) => {
-      const q = search.toLowerCase();
+      const term = search.toLowerCase();
       const matchesText =
-        job.title.toLowerCase().includes(q) ||
-        job.description.toLowerCase().includes(q) ||
-        job.skills.join(' ').toLowerCase().includes(q);
-      const matchesSkill = skill === 'All' || job.skills.includes(skill);
+        job.title.toLowerCase().includes(term) ||
+        job.description.toLowerCase().includes(term) ||
+        job.skills.join(' ').toLowerCase().includes(term);
+      const matchesSkill = skillFilter === 'All' || job.skills.includes(skillFilter);
       const matchesSaved = !savedOnly || savedJobIds.includes(job.id);
       return matchesText && matchesSkill && matchesSaved;
     })
     .sort((a, b) => {
-      if (sort === 'budget') return b.budget - a.budget;
-      if (sort === 'competition') return a.proposals - b.proposals;
-      return a.postedHours - b.postedHours;
+      if (sort === 'budget') return num(b.budget) - num(a.budget);
+      if (sort === 'competition') return num(a.proposal_count) - num(b.proposal_count);
+      return new Date(b.created_at) - new Date(a.created_at);
     });
 
   return (
@@ -79,14 +80,14 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
         </Row>
 
         <div className="wm-chips mt-3">
-          {skills.map((s) => (
+          {skills.map((skill) => (
             <button
-              key={s}
+              key={skill}
               type="button"
-              className={`wm-chip ${skill === s ? 'active' : ''}`}
-              onClick={() => setSkill(s)}
+              className={`wm-chip ${skillFilter === skill ? 'active' : ''}`}
+              onClick={() => setSkillFilter(skill)}
             >
-              {s}
+              {skill}
             </button>
           ))}
         </div>
@@ -99,7 +100,11 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
             title="No jobs match those filters"
             body="Try a broader skill or clear the search box."
             action={
-              <Button size="sm" variant="outline-secondary" onClick={() => { setSearch(''); setSkill('All'); setSavedOnly(false); }}>
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => { setSearch(''); setSkillFilter('All'); setSavedOnly(false); }}
+              >
                 Clear filters
               </Button>
             }
@@ -110,6 +115,7 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
           {visible.map((job) => {
             const applied = appliedIds.includes(job.id);
             const saved = savedJobIds.includes(job.id);
+
             return (
               <Col md={6} xl={4} key={job.id}>
                 <div className="wm-job">
@@ -117,7 +123,7 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
                     <div style={{ minWidth: 0 }}>
                       <h6 className="wm-job__title">{job.title}</h6>
                       <div className="wm-job__meta">
-                        {job.client} &middot; <Icon name="star" size={11} /> {job.clientRating} &middot; {job.clientJobs} jobs posted
+                        {job.client} &middot; <Icon name="star" size={11} /> {job.client_rating}
                       </div>
                     </div>
                     <button
@@ -139,12 +145,12 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
                   <p className="wm-job__desc">{job.description}</p>
 
                   <div className="wm-chips mb-2">
-                    {job.skills.map((s) => <span className="wm-tag" key={s}>{s}</span>)}
+                    {job.skills.map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
                   </div>
 
                   <div className="wm-job__foot">
                     <span className="text-muted" style={{ fontSize: '0.78rem' }}>
-                      {job.proposals} proposals &middot; {timeAgo(hoursAgo(job.postedHours))}
+                      {job.proposal_count} proposals &middot; {timeAgo(job.created_at)}
                     </span>
                     <div className="d-flex gap-2">
                       <Button size="sm" variant="outline-secondary" onClick={() => setDetail(job)}>Details</Button>
@@ -162,7 +168,6 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
         </Row>
       )}
 
-      {/* ---------- job detail ---------- */}
       <Modal show={Boolean(detail)} onHide={() => setDetail(null)} centered>
         {detail && (
           <>
@@ -175,7 +180,7 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
                 <div>
                   <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{detail.client}</div>
                   <div className="text-muted" style={{ fontSize: '0.8rem' }}>
-                    <Icon name="star" size={11} /> {detail.clientRating} from {detail.clientJobs} hires
+                    <Icon name="star" size={11} /> {detail.client_rating}
                   </div>
                 </div>
               </div>
@@ -193,12 +198,12 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
                 </Col>
                 <Col xs={4}>
                   <div className="wm-eyebrow">Competition</div>
-                  <div className="wm-num">{detail.proposals} bids</div>
+                  <div className="wm-num">{detail.proposal_count} bids</div>
                 </Col>
               </Row>
 
               <div className="wm-chips">
-                {detail.skills.map((s) => <span className="wm-tag" key={s}>{s}</span>)}
+                {detail.skills.map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
               </div>
             </Modal.Body>
             <Modal.Footer>

@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Row, Col, Form, InputGroup, Button } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { EmptyState, StatCard } from '../../../components/Shared';
 import ProjectCard from './ProjectCard';
 import {
-  money, orderStatus, orderEscrow, orderReleased, clientNeedsAttention, byUrgency,
-} from '../../../data/freelancerData';
+  money, orderStatus, orderEscrow, orderReleased, clientNeedsAttention, byUrgency, orderRef,
+} from '../../../data/helpers';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -28,17 +28,17 @@ const ClientProjects = ({ orders, onOpen, onGo }) => {
 
   const visible = orders
     .filter(matches)
-    .filter((o) => {
-      const q = search.toLowerCase();
+    .filter((order) => {
+      const term = search.toLowerCase();
       return (
-        o.project.toLowerCase().includes(q) ||
-        o.freelancer.name.toLowerCase().includes(q) ||
-        (o.ref || '').toLowerCase().includes(q)
+        order.project.toLowerCase().includes(term) ||
+        order.freelancer_name.toLowerCase().includes(term) ||
+        orderRef(order).toLowerCase().includes(term)
       );
     })
     .sort(byUrgency('client'));
 
-  const active = orders.filter((o) => orderStatus(o).key !== 'completed');
+  const active = orders.filter((order) => orderStatus(order).key !== 'completed');
 
   return (
     <>
@@ -49,14 +49,14 @@ const ClientProjects = ({ orders, onOpen, onGo }) => {
         <Col sm={4}>
           <StatCard
             label="In escrow" icon="lock" tone="warn"
-            value={money(active.reduce((sum, o) => sum + orderEscrow(o), 0))}
+            value={money(active.reduce((sum, order) => sum + orderEscrow(order), 0))}
             sub="Yours until you approve"
           />
         </Col>
         <Col sm={4}>
           <StatCard
             label="Released" icon="check" tone="success"
-            value={money(orders.reduce((sum, o) => sum + orderReleased(o), 0))}
+            value={money(orders.reduce((sum, order) => sum + orderReleased(order), 0))}
             sub="Across all projects"
           />
         </Col>
@@ -64,14 +64,14 @@ const ClientProjects = ({ orders, onOpen, onGo }) => {
 
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div className="wm-chips">
-          {FILTERS.map((f) => (
+          {FILTERS.map((item) => (
             <button
-              key={f.key}
+              key={item.key}
               type="button"
-              className={`wm-chip ${filter === f.key ? 'active' : ''}`}
-              onClick={() => setFilter(f.key)}
+              className={`wm-chip ${filter === item.key ? 'active' : ''}`}
+              onClick={() => setFilter(item.key)}
             >
-              {f.label}
+              {item.label}
             </button>
           ))}
         </div>

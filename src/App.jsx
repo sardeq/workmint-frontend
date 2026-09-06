@@ -1,10 +1,7 @@
-import React, { useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './style/index.css';
-
-import { AuthProvider, UserContext } from './data/AuthContext';
-import { WorkspaceProvider } from './data/WorkspaceContext';
 
 import Landing from './components/Landing';
 import AuthPage from './pages/auth/AuthPage';
@@ -12,46 +9,68 @@ import ClientDashboard from './pages/client/ClientDashboard';
 import FreelancerDashboard from './pages/Freelancer/FreelancerDashboard';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 
+const HOME_FOR = {
+  client: '/client',
+  freelancer: '/freelancer',
+  admin: '/admin',
+};
 
-export { UserContext };
-
-const HOME_FOR = { client: '/client', freelancer: '/freelancer', admin: '/admin' };
-
-const ProtectedRoute = ({ role, children }) => {
-  const { currentUser } = useContext(UserContext);
-  if (!currentUser) return <Navigate to="/login" replace />;
-  if (currentUser.role !== role) return <Navigate to={HOME_FOR[currentUser.role] || '/'} replace />;
-  return children;
+const savedUser = () => {
+  const saved = localStorage.getItem('user');
+  return saved ? JSON.parse(saved) : null;
 };
 
 function App() {
+  const [user, setUser] = useState(savedUser);
+
+  const handleLogin = (loggedInUser) => {
+    setUser(loggedInUser);
+    localStorage.setItem('user', JSON.stringify(loggedInUser));
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+  };
+
+  const updateUser = (changes) => {
+    const next = { ...user, ...changes };
+    setUser(next);
+    localStorage.setItem('user', JSON.stringify(next));
+  };
+
+  const protectedPage = (role, page) => {
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role !== role) return <Navigate to={HOME_FOR[user.role] || '/'} replace />;
+    return page;
+  };
+
   return (
-    <AuthProvider>
-      <WorkspaceProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<AuthPage mode="login" />} />
-            <Route path="/register" element={<AuthPage mode="register" />} />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<AuthPage mode="login" user={user} onLogin={handleLogin} />} />
+        <Route path="/register" element={<AuthPage mode="register" user={user} onLogin={handleLogin} />} />
 
-            <Route
-              path="/client"
-              element={<ProtectedRoute role="client"><ClientDashboard /></ProtectedRoute>}
-            />
-            <Route
-              path="/freelancer"
-              element={<ProtectedRoute role="freelancer"><FreelancerDashboard /></ProtectedRoute>}
-            />
-            <Route
-              path="/admin"
-              element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>}
-            />
+        <Route
+          path="/client"
+          element={protectedPage('client', <ClientDashboard user={user} onLogout={handleLogout} />)}
+        />
+        <Route
+          path="/freelancer"
+          element={protectedPage(
+            'freelancer',
+            <FreelancerDashboard user={user} onLogout={handleLogout} onUpdateUser={updateUser} />
+          )}
+        />
+        <Route
+          path="/admin"
+          element={protectedPage('admin', <AdminDashboard user={user} onLogout={handleLogout} />)}
+        />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
-      </WorkspaceProvider>
-    </AuthProvider>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

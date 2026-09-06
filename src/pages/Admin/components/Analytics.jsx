@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Row, Col, Form, Table } from 'react-bootstrap';
 import axios from 'axios';
 import { StatCard, Pill, EmptyState } from '../../../components/Shared';
 import {
-  money, FEE_RATE, orderStatus, orderTotal, orderEscrow, orderReleased,
-} from '../../../data/freelancerData';
+  money, num, FEE_RATE, orderStatus, orderTotal, orderEscrow, orderReleased, milestonesOf,
+} from '../../../data/helpers';
 
 const CURRENCIES = [
   { code: 'USD', label: 'US dollar', fallback: 1 },
@@ -16,7 +16,7 @@ const CURRENCIES = [
 const Analytics = ({ orders, users, disputes, jobs }) => {
   const [currency, setCurrency] = useState('USD');
   const [rates, setRates] = useState({ USD: 1 });
-  const [status, setStatus] = useState('loading'); // loading | live | offline
+  const [status, setStatus] = useState('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -31,7 +31,7 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
       .catch(() => {
         if (cancelled) return;
         const fallback = {};
-        CURRENCIES.forEach((c) => { fallback[c.code] = c.fallback; });
+        CURRENCIES.forEach((item) => { fallback[item.code] = item.fallback; });
         setRates(fallback);
         setStatus('offline');
       });
@@ -40,58 +40,57 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
   }, []);
 
   const rate = rates[currency] || 1;
-  /* Convert at render time only. Everything is stored in USD. */
+
   const show = (usd) =>
     currency === 'USD'
       ? money(usd)
       : `${(usd * rate).toLocaleString('en-US', { maximumFractionDigits: 0 })} ${currency}`;
 
-  const gmv = orders.reduce((sum, o) => sum + orderTotal(o), 0);
-  const released = orders.reduce((sum, o) => sum + orderReleased(o), 0);
-  const escrow = orders.reduce((sum, o) => sum + orderEscrow(o), 0);
+  const gmv = orders.reduce((sum, order) => sum + orderTotal(order), 0);
+  const released = orders.reduce((sum, order) => sum + orderReleased(order), 0);
+  const escrow = orders.reduce((sum, order) => sum + orderEscrow(order), 0);
   const fees = Math.round(released * FEE_RATE);
-  const avgContract = orders.length ? Math.round(gmv / orders.length) : 0;
-  const disputeRate = orders.length ? Math.round((disputes.length / orders.length) * 100) : 0;
+  const avgContract = orders.length === 0 ? 0 : Math.round(gmv / orders.length);
+  const disputeRate = orders.length === 0 ? 0 : Math.round((disputes.length / orders.length) * 100);
 
-  /* Released per month for the last six, straight from approved milestones. */
   const months = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i, 1);
+    const date = new Date();
+    date.setMonth(date.getMonth() - i, 1);
     months.push({
-      key: `${d.getFullYear()}-${d.getMonth()}`,
-      label: d.toLocaleDateString('en-US', { month: 'short' }),
+      key: `${date.getFullYear()}-${date.getMonth()}`,
+      label: date.toLocaleDateString('en-US', { month: 'short' }),
       total: 0,
     });
   }
 
-  orders.forEach((order) =>
-    order.milestones
-      .filter((m) => m.status === 'approved')
-      .forEach((m) => {
-        const d = new Date(m.approvedOn || order.deadline);
-        const bucket = months.find((b) => b.key === `${d.getFullYear()}-${d.getMonth()}`);
-        if (bucket) bucket.total += m.amount;
-      })
-  );
-  const peak = Math.max(...months.map((m) => m.total), 1);
+  orders.forEach((order) => {
+    milestonesOf(order)
+      .filter((milestone) => milestone.status === 'approved')
+      .forEach((milestone) => {
+        const date = new Date(milestone.approved_on || order.deadline);
+        const bucket = months.find((month) => month.key === `${date.getFullYear()}-${date.getMonth()}`);
+        if (bucket) bucket.total += num(milestone.amount);
+      });
+  });
 
-  /* Earnings by freelancer and spend by client, both derived from orders.
-     Each list holds { name, amount } rows, so one small helper builds both. */
+  const peak = Math.max(...months.map((month) => month.total), 1);
+
   const addTo = (list, name, amount) => {
     const found = list.find((row) => row.name === name);
     if (found) {
       found.amount += amount;
     } else {
-      list.push({ name: name, amount: amount });
+      list.push({ name, amount });
     }
   };
 
   const freelancerTotals = [];
   const clientTotals = [];
+
   orders.forEach((order) => {
     const earned = orderReleased(order);
-    addTo(freelancerTotals, order.freelancer.name, earned);
+    addTo(freelancerTotals, order.freelancer_name, earned);
     addTo(clientTotals, order.client, earned);
   });
 
@@ -120,7 +119,7 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
           onChange={(e) => setCurrency(e.target.value)}
           style={{ maxWidth: 220 }}
         >
-          {CURRENCIES.map((c) => <option value={c.code} key={c.code}>{c.code} - {c.label}</option>)}
+          {CURRENCIES.map((item) => <option value={item.code} key={item.code}>{item.code} - {item.label}</option>)}
         </Form.Select>
       </div>
 
@@ -148,10 +147,10 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
           <div className="wm-panel mb-3">
             <div className="wm-eyebrow mb-3">Released per month</div>
             <div className="wm-bars">
-              {months.map((m) => (
-                <div className="wm-bars__col" key={m.key} title={show(m.total)}>
-                  <div className="wm-bars__bar" style={{ height: `${Math.max((m.total / peak) * 100, 3)}%` }} />
-                  <span className="wm-bars__label">{m.label}</span>
+              {months.map((month) => (
+                <div className="wm-bars__col" key={month.key} title={show(month.total)}>
+                  <div className="wm-bars__bar" style={{ height: `${Math.max((month.total / peak) * 100, 3)}%` }} />
+                  <span className="wm-bars__label">{month.label}</span>
                 </div>
               ))}
             </div>
@@ -165,9 +164,9 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
             <div className="wm-eyebrow mb-3">Marketplace funnel</div>
             {[
               { label: 'Open listings', value: jobs.length },
-              { label: 'Proposals sent', value: orders.length + jobs.reduce((s, j) => s + j.proposals, 0) },
+              { label: 'Proposals sent', value: orders.length + jobs.reduce((sum, job) => sum + num(job.proposal_count), 0) },
               { label: 'Contracts started', value: orders.length },
-              { label: 'Contracts completed', value: orders.filter((o) => orderStatus(o).key === 'completed').length },
+              { label: 'Contracts completed', value: orders.filter((order) => orderStatus(order).key === 'completed').length },
             ].map((step, index, all) => (
               <div key={step.label} className="d-flex align-items-center gap-3 py-2">
                 <span className="text-muted" style={{ fontSize: '0.86rem', minWidth: 150 }}>{step.label}</span>
@@ -232,11 +231,11 @@ const Analytics = ({ orders, users, disputes, jobs }) => {
             <div className="wm-eyebrow mb-2">Accounts</div>
             <div className="d-flex justify-content-between py-1" style={{ fontSize: '0.88rem' }}>
               <span className="text-muted">Clients</span>
-              <span className="wm-num">{users.filter((u) => u.role === 'client').length}</span>
+              <span className="wm-num">{users.filter((person) => person.role === 'client').length}</span>
             </div>
             <div className="d-flex justify-content-between py-1" style={{ fontSize: '0.88rem' }}>
               <span className="text-muted">Freelancers</span>
-              <span className="wm-num">{users.filter((u) => u.role === 'freelancer').length}</span>
+              <span className="wm-num">{users.filter((person) => person.role === 'freelancer').length}</span>
             </div>
             <div className="d-flex justify-content-between py-1" style={{ fontSize: '0.88rem' }}>
               <span className="text-muted">Average contract</span>

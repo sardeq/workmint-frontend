@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Row, Col, Form, InputGroup, Button, Modal } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, EmptyState, Avatar } from '../../../components/Shared';
-import { money } from '../../../data/freelancerData';
+import { money, num } from '../../../data/helpers';
 
 const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
   const [search, setSearch] = useState('');
-  const [skill, setSkill] = useState('All');
+  const [skillFilter, setSkillFilter] = useState('All');
   const [sort, setSort] = useState('rating');
   const [availableOnly, setAvailableOnly] = useState(false);
   const [viewing, setViewing] = useState(null);
@@ -15,37 +15,36 @@ const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
 
   const skills = ['All'];
   talent.forEach((person) => {
-    person.skills.forEach((skill) => {
+    (person.skills || []).forEach((skill) => {
       if (!skills.includes(skill)) skills.push(skill);
     });
   });
 
   const visible = talent
     .filter((person) => {
-      const q = search.toLowerCase();
+      const term = search.toLowerCase();
       const matchesText =
-        person.name.toLowerCase().includes(q) ||
-        person.title.toLowerCase().includes(q) ||
-        person.skills.join(' ').toLowerCase().includes(q);
-      const matchesSkill = skill === 'All' || person.skills.includes(skill);
+        person.name.toLowerCase().includes(term) ||
+        (person.title || '').toLowerCase().includes(term) ||
+        (person.skills || []).join(' ').toLowerCase().includes(term);
+      const matchesSkill = skillFilter === 'All' || (person.skills || []).includes(skillFilter);
       const matchesAvailability = !availableOnly || person.available;
       return matchesText && matchesSkill && matchesAvailability;
     })
     .sort((a, b) => {
-      if (sort === 'rate-low') return a.rate - b.rate;
-      if (sort === 'rate-high') return b.rate - a.rate;
-      if (sort === 'experience') return b.jobs - a.jobs;
-      return b.rating - a.rating;
+      if (sort === 'rate-low') return num(a.hourly_rate) - num(b.hourly_rate);
+      if (sort === 'rate-high') return num(b.hourly_rate) - num(a.hourly_rate);
+      return num(b.rating) - num(a.rating);
     });
 
   const openInvite = (person) => {
     setInviting(person);
-    setJobId(jobs.length ? jobs[0].id : '');
+    setJobId(jobs.length > 0 ? jobs[0].id : '');
     setViewing(null);
   };
 
   const sendInvite = () => {
-    const job = jobs.find((j) => j.id === jobId);
+    const job = jobs.find((item) => item.id === Number(jobId));
     if (job) onInvite(inviting, job);
     setInviting(null);
   };
@@ -70,7 +69,6 @@ const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
           <Col md={4}>
             <Form.Select value={sort} onChange={(e) => setSort(e.target.value)}>
               <option value="rating">Highest rated</option>
-              <option value="experience">Most orders completed</option>
               <option value="rate-low">Lowest rate</option>
               <option value="rate-high">Highest rate</option>
             </Form.Select>
@@ -87,9 +85,14 @@ const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
         </Row>
 
         <div className="wm-chips mt-3">
-          {skills.map((s) => (
-            <button key={s} type="button" className={`wm-chip ${skill === s ? 'active' : ''}`} onClick={() => setSkill(s)}>
-              {s}
+          {skills.map((skill) => (
+            <button
+              key={skill}
+              type="button"
+              className={`wm-chip ${skillFilter === skill ? 'active' : ''}`}
+              onClick={() => setSkillFilter(skill)}
+            >
+              {skill}
             </button>
           ))}
         </div>
@@ -122,18 +125,18 @@ const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
                     {person.available ? 'Available' : 'Booked'}
                   </Pill>
                   <Pill tone="muted"><Icon name="star" size={11} /> {person.rating}</Pill>
-                  <Pill tone="muted">{person.jobs} orders</Pill>
+                  <Pill tone="muted">Replies in ~{person.response_hours || 4}h</Pill>
                 </div>
 
                 <p className="text-muted" style={{ fontSize: '0.86rem', lineHeight: 1.6 }}>{person.bio}</p>
 
                 <div className="wm-chips mb-3">
-                  {person.skills.slice(0, 4).map((s) => <span className="wm-tag" key={s}>{s}</span>)}
+                  {(person.skills || []).slice(0, 4).map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
                 </div>
 
                 <div className="mt-auto pt-3 border-top d-flex justify-content-between align-items-center gap-2">
                   <span className="wm-num">
-                    {money(person.rate)}<span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.85rem' }}>/hr</span>
+                    {money(person.hourly_rate)}<span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.85rem' }}>/hr</span>
                   </span>
                   <div className="d-flex gap-2">
                     <Button size="sm" variant="outline-secondary" onClick={() => setViewing(person)}>Profile</Button>
@@ -154,7 +157,6 @@ const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
         </p>
       )}
 
-      {/* ---------- profile ---------- */}
       <Modal show={Boolean(viewing)} onHide={() => setViewing(null)} centered>
         {viewing && (
           <>
@@ -169,21 +171,17 @@ const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
             </Modal.Header>
             <Modal.Body>
               <Row className="g-2 mb-3">
-                <Col xs={3}>
+                <Col xs={4}>
                   <div className="wm-eyebrow">Rate</div>
-                  <div className="wm-num">{money(viewing.rate)}</div>
+                  <div className="wm-num">{money(viewing.hourly_rate)}</div>
                 </Col>
-                <Col xs={3}>
+                <Col xs={4}>
                   <div className="wm-eyebrow">Rating</div>
                   <div className="wm-num">{viewing.rating}</div>
                 </Col>
-                <Col xs={3}>
-                  <div className="wm-eyebrow">Orders</div>
-                  <div className="wm-num">{viewing.jobs}</div>
-                </Col>
-                <Col xs={3}>
+                <Col xs={4}>
                   <div className="wm-eyebrow">Replies</div>
-                  <div className="wm-num">~{viewing.responseHours}h</div>
+                  <div className="wm-num">~{viewing.response_hours || 4}h</div>
                 </Col>
               </Row>
 
@@ -191,7 +189,7 @@ const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
 
               <div className="wm-eyebrow mt-3 mb-2">Skills</div>
               <div className="wm-chips">
-                {viewing.skills.map((s) => <span className="wm-tag" key={s}>{s}</span>)}
+                {(viewing.skills || []).map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
               </div>
 
               <div className="text-muted mt-3" style={{ fontSize: '0.83rem' }}>
@@ -208,7 +206,6 @@ const FindFreelancers = ({ talent, jobs, onInvite, onGo }) => {
         )}
       </Modal>
 
-      {/* ---------- invite ---------- */}
       <Modal show={Boolean(inviting)} onHide={() => setInviting(null)} centered>
         {inviting && (
           <>

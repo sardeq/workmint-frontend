@@ -1,7 +1,6 @@
-import React from 'react';
 import Icon from './Icon';
 import { Avatar } from './Shared';
-import { money } from '../data/freelancerData';
+import { money } from '../data/helpers';
 
 const FREELANCERS = [
   { id: 1, name: 'Sarah Khoury', role: 'React & .NET architect', rating: 4.9, jobs: 41, rate: 45, skills: ['React', '.NET', 'SQL Server'] },

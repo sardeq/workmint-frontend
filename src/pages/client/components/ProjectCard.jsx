@@ -1,14 +1,11 @@
-import React from 'react';
 import { Button } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, Avatar, EscrowBar } from '../../../components/Shared';
 import {
-  money, shortDate, deadlineLabel, deadlineTone,
+  money, shortDate, deadlineLabel, deadlineTone, milestonesOf,
   orderStatus, orderTotal, orderReleased, orderEscrow, orderProgress, unreadCount, clientNextAction,
-} from '../../../data/freelancerData';
+} from '../../../data/helpers';
 
-/* One card per contract. Everything on it answers "where is my money and
-   what happens next", which is the only question a client card needs to. */
 const ProjectCard = ({ project, onOpen }) => {
   const status = orderStatus(project, 'client');
   const action = clientNextAction(project);
@@ -21,8 +18,8 @@ const ProjectCard = ({ project, onOpen }) => {
         <div style={{ minWidth: 0 }}>
           <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)', marginBottom: '0.35rem' }}>{project.project}</h6>
           <div className="d-flex align-items-center gap-2">
-            <Avatar name={project.freelancer.name} size={26} />
-            <span className="text-muted" style={{ fontSize: '0.82rem' }}>{project.freelancer.name}</span>
+            <Avatar name={project.freelancer_name} size={26} />
+            <span className="text-muted" style={{ fontSize: '0.82rem' }}>{project.freelancer_name}</span>
           </div>
         </div>
         <Pill tone={status.tone}>{status.label}</Pill>
@@ -49,7 +46,7 @@ const ProjectCard = ({ project, onOpen }) => {
         <span className="text-muted">
           {done ? `Delivered ${shortDate(project.deadline)}` : deadlineLabel(project.deadline)}
         </span>
-        {!done && <Pill tone={deadlineTone(project.deadline)}>{project.milestones.length} milestones</Pill>}
+        {!done && <Pill tone={deadlineTone(project.deadline)}>{milestonesOf(project).length} milestones</Pill>}
       </div>
 
       {action && (

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Row, Col, Button, Modal, Form } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { EmptyState, SectionTitle } from '../../../components/Shared';
-import { initials } from '../../../data/freelancerData';
+import { initials } from '../../../data/helpers';
 
 const BLANK = { title: '', tech: '', link: '', description: '' };
 
@@ -20,7 +20,7 @@ const Portfolio = ({ items, onSave, onDelete }) => {
 
   const openEdit = (item) => {
     setEditingId(item.id);
-    setForm({ ...item, tech: item.tech.join(', ') });
+    setForm({ ...item, tech: (item.tech || []).join(', ') });
     setShow(true);
   };
 
@@ -32,7 +32,7 @@ const Portfolio = ({ items, onSave, onDelete }) => {
       title: form.title.trim(),
       link: form.link.trim(),
       description: form.description.trim(),
-      tech: form.tech.split(',').map((t) => t.trim()).filter(Boolean),
+      tech: form.tech.split(',').map((tech) => tech.trim()).filter(Boolean),
     });
     setShow(false);
   };
@@ -63,7 +63,7 @@ const Portfolio = ({ items, onSave, onDelete }) => {
                 <div className="p-3 d-flex flex-column flex-grow-1">
                   <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)', marginBottom: '0.4rem' }}>{item.title}</h6>
                   <div className="wm-chips mb-2">
-                    {item.tech.map((t) => <span className="wm-tag" key={t}>{t}</span>)}
+                    {(item.tech || []).map((tech) => <span className="wm-tag" key={tech}>{tech}</span>)}
                   </div>
                   <p className="text-muted" style={{ fontSize: '0.85rem', lineHeight: 1.55 }}>{item.description}</p>
 
@@ -91,7 +91,6 @@ const Portfolio = ({ items, onSave, onDelete }) => {
         </Row>
       )}
 
-      {/* add / edit */}
       <Modal show={show} onHide={() => setShow(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>{editingId ? 'Edit project' : 'Add project'}</Modal.Title>
@@ -142,7 +141,6 @@ const Portfolio = ({ items, onSave, onDelete }) => {
         </Form>
       </Modal>
 
-      {/* delete confirmation */}
       <Modal show={Boolean(confirmId)} onHide={() => setConfirmId(null)} centered size="sm">
         <Modal.Body className="text-center p-4">
           <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>Remove this project?</h6>

@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Table, Button, Form, InputGroup, Modal, Row, Col } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, StatCard, EmptyState } from '../../../components/Shared';
 import {
-  money, timeAgo, shortDate, deadlineLabel, deadlineTone,
+  money, timeAgo, shortDate, deadlineLabel, deadlineTone, orderRef, milestonesOf,
   orderStatus, orderTotal, orderEscrow, orderReleased,
-} from '../../../data/freelancerData';
+} from '../../../data/helpers';
 
 const VIEWS = [
   { key: 'jobs', label: 'Open listings' },
@@ -17,14 +17,18 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
   const [search, setSearch] = useState('');
   const [removing, setRemoving] = useState(null);
 
-  const active = orders.filter((o) => orderStatus(o).key !== 'completed');
-  const gmv = orders.reduce((sum, o) => sum + orderTotal(o), 0);
+  const active = orders.filter((order) => orderStatus(order).key !== 'completed');
+  const gmv = orders.reduce((sum, order) => sum + orderTotal(order), 0);
 
-  const matches = (text) => text.toLowerCase().includes(search.toLowerCase());
+  const matches = (text) => String(text).toLowerCase().includes(search.toLowerCase());
 
-  const visibleJobs = jobs.filter((j) => matches(j.title) || matches(j.client));
+  const visibleJobs = jobs.filter((job) => matches(job.title) || matches(job.client));
   const visibleOrders = orders.filter(
-    (o) => matches(o.project) || matches(o.client) || matches(o.freelancer.name) || matches(o.id)
+    (order) =>
+      matches(order.project) ||
+      matches(order.client) ||
+      matches(order.freelancer_name) ||
+      matches(orderRef(order))
   );
 
   return (
@@ -51,10 +55,15 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
       <div className="wm-panel wm-panel--flush">
         <div className="wm-panel__head d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div className="wm-chips">
-            {VIEWS.map((v) => (
-              <button key={v.key} type="button" className={`wm-chip ${view === v.key ? 'active' : ''}`} onClick={() => setView(v.key)}>
-                {v.label}
-                <span className="wm-chip__count">{v.key === 'jobs' ? jobs.length : orders.length}</span>
+            {VIEWS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`wm-chip ${view === item.key ? 'active' : ''}`}
+                onClick={() => setView(item.key)}
+              >
+                {item.label}
+                <span className="wm-chip__count">{item.key === 'jobs' ? jobs.length : orders.length}</span>
               </button>
             ))}
           </div>
@@ -88,19 +97,19 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
               </thead>
               <tbody>
                 {visibleJobs.map((job) => {
-                  const bids = proposals.filter((p) => p.jobId === job.id).length;
+                  const bids = proposals.filter((p) => p.job_id === job.id).length;
                   return (
                     <tr key={job.id}>
                       <td>
                         <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{job.title}</div>
                         <div className="wm-chips mt-1">
-                          {job.skills.slice(0, 3).map((s) => <span className="wm-tag" key={s}>{s}</span>)}
+                          {job.skills.slice(0, 3).map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
                         </div>
                       </td>
                       <td>
                         <div style={{ fontSize: '0.87rem' }}>{job.client}</div>
                         <div className="text-muted" style={{ fontSize: '0.77rem' }}>
-                          <Icon name="star" size={11} /> {job.clientRating}
+                          <Icon name="star" size={11} /> {job.client_rating}
                         </div>
                       </td>
                       <td>
@@ -109,7 +118,7 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
                       </td>
                       <td><Pill tone={bids > 0 ? 'info' : 'muted'}>{bids}</Pill></td>
                       <td className="text-muted" style={{ fontSize: '0.83rem' }}>
-                        {timeAgo(new Date(Date.now() - job.postedHours * 3600000).toISOString())}
+                        {timeAgo(job.created_at)}
                       </td>
                       <td className="text-end">
                         <Button size="sm" variant="outline-secondary" onClick={() => setRemoving(job)}>
@@ -145,12 +154,12 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
                     <td>
                       <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{order.project}</div>
                       <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                        {order.ref} &middot; {order.milestones.length} milestones
+                        {orderRef(order)} &middot; {milestonesOf(order).length} milestones
                       </div>
                     </td>
                     <td>
                       <div style={{ fontSize: '0.85rem' }}>{order.client}</div>
-                      <div className="text-muted" style={{ fontSize: '0.78rem' }}>{order.freelancer.name}</div>
+                      <div className="text-muted" style={{ fontSize: '0.78rem' }}>{order.freelancer_name}</div>
                     </td>
                     <td className="wm-num" style={{ color: orderEscrow(order) > 0 ? 'var(--amber)' : 'inherit' }}>
                       {money(orderEscrow(order))}

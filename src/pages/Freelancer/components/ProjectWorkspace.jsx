@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Form, Row, Col, Modal, Alert } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, EmptyState, Avatar } from '../../../components/Shared';
 import RaiseDisputeModal from '../../../components/RaiseDisputeModal';
 import {
-  money, netOf, shortDate, timeAgo, deadlineLabel, deadlineTone,
+  money, netOf, shortDate, timeAgo, deadlineLabel, deadlineTone, orderRef,
   MILESTONE_STATUS, orderStatus, orderTotal, orderReleased, orderEscrow, orderProgress, unreadCount,
-} from '../../../data/freelancerData';
+  milestonesOf, messagesOf, activityOf, changeRequestsOf,
+} from '../../../data/helpers';
 
 const DOT_ICON = { approved: 'check', active: 'clock', submitted: 'upload', revision: 'revision', pending: 'lock', disputed: 'alert', refunded: 'back' };
 
@@ -19,34 +20,27 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
   const [scopeForm, setScopeForm] = useState({ reason: '', extraCost: '', extraDays: '' });
   const [scopeError, setScopeError] = useState('');
 
-  const unread = unreadCount(order);
+  const unread = unreadCount(order, 'freelancer');
   const status = orderStatus(order);
 
-  // Opening the thread clears its unread count.
   useEffect(() => {
     if (tab === 'messages') onRead(order.id, 'freelancer');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, order.id]);
 
-  // Keep the newest message in view.
   useEffect(() => {
-    // Scroll the newest message into view (plain DOM, no ref needed).
     const node = document.getElementById('workspace-chat-end');
-    if (tab === 'messages' && node) {
-      node.scrollIntoView({ block: 'nearest' });
-    }
-  }, [tab, order.messages.length]);
+    if (tab === 'messages' && node) node.scrollIntoView({ block: 'nearest' });
+  }, [tab, messagesOf(order).length]);
 
   const draftFor = (id) => drafts[id] || { link: '', note: '' };
-  const setDraft = (id, patch) =>
-    setDrafts((prev) => ({ ...prev, [id]: { ...draftFor(id), ...patch } }));
+  const setDraft = (id, changes) => setDrafts({ ...drafts, [id]: { ...draftFor(id), ...changes } });
 
   const handleDeliver = (e, milestone) => {
     e.preventDefault();
     const draft = draftFor(milestone.id);
     if (!draft.link.trim()) return;
     onSubmit(order.id, milestone.id, { link: draft.link.trim(), note: draft.note.trim() });
-    setDrafts((prev) => ({ ...prev, [milestone.id]: { link: '', note: '' } }));
+    setDrafts({ ...drafts, [milestone.id]: { link: '', note: '' } });
   };
 
   const handleScope = (e) => {
@@ -72,11 +66,10 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
     setMessage('');
   };
 
-  /* ---------------- one milestone ---------------- */
   const renderMilestone = (milestone, index) => {
     const meta = MILESTONE_STATUS[milestone.status];
     const draft = draftFor(milestone.id);
-    const revisionsLeft = order.revisionsIncluded - milestone.revisionsUsed;
+    const revisionsLeft = order.revisions_included - milestone.revisions_used;
     const canDeliver = milestone.status === 'active' || milestone.status === 'revision';
 
     return (
@@ -97,10 +90,10 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
                 {milestone.title}
               </p>
               <div className="wm-milestone__meta">
-                Due {shortDate(milestone.dueDate)}
-                {milestone.status !== 'approved' && <> &middot; {deadlineLabel(milestone.dueDate)}</>}
-                {milestone.revisionsUsed > 0 && (
-                  <> &middot; {milestone.revisionsUsed} of {order.revisionsIncluded} revisions used</>
+                Due {shortDate(milestone.due_date)}
+                {milestone.status !== 'approved' && <> &middot; {deadlineLabel(milestone.due_date)}</>}
+                {milestone.revisions_used > 0 && (
+                  <> &middot; {milestone.revisions_used} of {order.revisions_included} revisions used</>
                 )}
               </div>
             </div>
@@ -111,11 +104,10 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
             </div>
           </div>
 
-          {/* what the client said, when they sent it back */}
           {milestone.status === 'revision' && (
             <div className="wm-note wm-note--danger">
               <strong>{order.client} asked for changes</strong>
-              {milestone.revisionNote}
+              {milestone.revision_note}
               {revisionsLeft <= 0 && (
                 <div className="mt-2">
                   <Pill tone="warn">No free revisions left</Pill>{' '}
@@ -135,14 +127,13 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
             </div>
           )}
 
-          {/* what you last sent */}
-          {milestone.deliverable && milestone.status !== 'revision' && (
+          {milestone.deliverable_link && milestone.status !== 'revision' && (
             <div className="wm-note wm-note--muted">
-              <strong>Delivered {timeAgo(milestone.deliverable.at)}</strong>
-              <a href={milestone.deliverable.link} target="_blank" rel="noreferrer" className="text-decoration-none">
-                {milestone.deliverable.link} <Icon name="external" size={12} />
+              <strong>Delivered {timeAgo(milestone.delivered_at)}</strong>
+              <a href={milestone.deliverable_link} target="_blank" rel="noreferrer" className="text-decoration-none">
+                {milestone.deliverable_link} <Icon name="external" size={12} />
               </a>
-              {milestone.deliverable.note && <div className="text-muted mt-1">{milestone.deliverable.note}</div>}
+              {milestone.deliverable_note && <div className="text-muted mt-1">{milestone.deliverable_note}</div>}
             </div>
           )}
 
@@ -221,7 +212,6 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
         <Icon name="back" size={15} className="me-1" /> All orders
       </Button>
 
-      {/* ---------- header ---------- */}
       <div className="wm-panel mb-3">
         <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
           <div style={{ minWidth: 0 }}>
@@ -238,7 +228,7 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
             </div>
             <div className="d-flex align-items-center gap-2 text-muted" style={{ fontSize: '0.85rem' }}>
               <Avatar name={order.client} size={24} tone="slate" />
-              {order.client} &middot; {order.ref} &middot; started {shortDate(order.startedOn)}
+              {order.client} &middot; {orderRef(order)} &middot; started {shortDate(order.started_on)}
             </div>
             <p className="text-muted mt-2 mb-0" style={{ fontSize: '0.87rem', maxWidth: 620 }}>{order.brief}</p>
           </div>
@@ -276,7 +266,6 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
         </Row>
       </div>
 
-      {/* ---------- tabs ---------- */}
       <div className="wm-tabs">
         <button type="button" className={`wm-tab ${tab === 'milestones' ? 'active' : ''}`} onClick={() => setTab('milestones')}>
           <Icon name="layers" size={14} /> Milestones
@@ -293,18 +282,20 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
         </button>
       </div>
 
-      {tab === 'milestones' && <div className="wm-rail">{order.milestones.map(renderMilestone)}</div>}
+      {tab === 'milestones' && <div className="wm-rail">{milestonesOf(order).map(renderMilestone)}</div>}
 
       {tab === 'messages' && (
         <div className="wm-panel">
-          {order.messages.length === 0 ? (
+          {messagesOf(order).length === 0 ? (
             <EmptyState icon="chat" title="No messages yet" body={`Say hello to ${order.client} and confirm the first milestone.`} />
           ) : (
             <div className="wm-chat">
-              {order.messages.map((m) => (
-                <div key={m.id} className={`wm-bubble wm-bubble--${m.from === 'freelancer' ? 'you' : 'client'}`}>
-                  {m.text}
-                  <div className="wm-bubble__meta">{m.from === 'freelancer' ? 'You' : order.client} &middot; {timeAgo(m.at)}</div>
+              {messagesOf(order).map((item) => (
+                <div key={item.id} className={`wm-bubble wm-bubble--${item.sender_role === 'freelancer' ? 'you' : 'client'}`}>
+                  {item.body}
+                  <div className="wm-bubble__meta">
+                    {item.sender_role === 'freelancer' ? 'You' : order.client} &middot; {timeAgo(item.sent_at)}
+                  </div>
                 </div>
               ))}
               <div id="workspace-chat-end" />
@@ -326,7 +317,7 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
 
       {tab === 'requests' && (
         <div className="wm-panel">
-          {order.changeRequests.length === 0 ? (
+          {changeRequestsOf(order).length === 0 ? (
             <EmptyState
               icon="file"
               title="No scope changes on this order"
@@ -334,15 +325,15 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
               action={<Button size="sm" variant="outline-primary" onClick={() => setShowScope(true)}>Request scope change</Button>}
             />
           ) : (
-            order.changeRequests.map((cr) => (
+            changeRequestsOf(order).map((cr) => (
               <div key={cr.id} className="d-flex justify-content-between align-items-start gap-3 py-3 border-bottom">
                 <div>
                   <div style={{ fontWeight: 600, color: 'var(--slate-dark)', fontSize: '0.92rem' }}>{cr.reason}</div>
-                  <div className="text-muted" style={{ fontSize: '0.8rem' }}>Sent {timeAgo(cr.at)}</div>
+                  <div className="text-muted" style={{ fontSize: '0.8rem' }}>Sent {timeAgo(cr.created_at)}</div>
                 </div>
                 <div className="text-end">
-                  <div className="wm-num">+{money(cr.extraCost)}</div>
-                  <div className="text-muted" style={{ fontSize: '0.78rem' }}>+{cr.extraDays} days</div>
+                  <div className="wm-num">+{money(cr.extra_cost)}</div>
+                  <div className="text-muted" style={{ fontSize: '0.78rem' }}>+{cr.extra_days} days</div>
                   <Pill tone={cr.status === 'Approved' ? 'success' : cr.status === 'Declined' ? 'danger' : 'warn'}>
                     {cr.status}
                   </Pill>
@@ -356,10 +347,10 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
       {tab === 'activity' && (
         <div className="wm-panel">
           <ul className="wm-timeline">
-            {order.activity.map((a) => (
-              <li key={a.id} className={a.actor === 'client' ? 'is-client' : a.actor === 'system' ? 'is-system' : ''}>
-                {a.text}
-                <time>{timeAgo(a.at)}</time>
+            {activityOf(order).map((item) => (
+              <li key={item.id} className={item.actor === 'client' ? 'is-client' : item.actor === 'system' ? 'is-system' : ''}>
+                {item.text}
+                <time>{timeAgo(item.at)}</time>
               </li>
             ))}
           </ul>
@@ -374,7 +365,6 @@ const ProjectWorkspace = ({ order, onBack, onStart, onSubmit, onScopeChange, onS
         onSubmit={onRaiseDispute}
       />
 
-      {/* ---------- scope change ---------- */}
       <Modal show={showScope} onHide={() => setShowScope(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Request a scope change</Modal.Title>

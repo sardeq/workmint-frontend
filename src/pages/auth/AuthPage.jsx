@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { Form, Button, Alert } from 'react-bootstrap';
 import Icon from '../../components/Icon';
 import { Pill } from '../../components/Shared';
-import { useAuth, MIN_PASSWORD } from '../../data/AuthContext';
+import { usersApi, errorText } from '../../api/api';
+
+const MIN_PASSWORD = 8;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const HOME_FOR = { client: '/client', freelancer: '/freelancer', admin: '/admin' };
 
@@ -20,25 +23,25 @@ const ROLES = [
 
 const BLANK = { name: '', email: '', company: '', title: '', password: '', confirm: '', accepted: false };
 
-
 const strengthOf = (password) => {
   if (!password) return { score: 0, label: '', tone: 'muted' };
+
   let score = 0;
   if (password.length >= MIN_PASSWORD) score += 1;
   if (password.length >= 12) score += 1;
   if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 1;
   if (/\d/.test(password)) score += 1;
   if (/[^A-Za-z0-9]/.test(password)) score += 1;
+
   if (score <= 2) return { score, label: 'Weak', tone: 'danger' };
   if (score === 3) return { score, label: 'Fair', tone: 'warn' };
   if (score === 4) return { score, label: 'Good', tone: 'info' };
   return { score, label: 'Strong', tone: 'success' };
 };
 
-const AuthPage = ({ mode }) => {
+const AuthPage = ({ mode, user, onLogin }) => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { login, register } = useAuth();
 
   const isLogin = mode === 'login';
 
@@ -47,33 +50,79 @@ const AuthPage = ({ mode }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [field, setField] = useState('');
-  const [submitted, setSubmitted] = useState(null); // pending-review screen
+  const [submitted, setSubmitted] = useState(null);
 
-  const set = (patch) => { setForm({ ...form, ...patch }); setError(''); setField(''); };
+  if (user) return <Navigate to={HOME_FOR[user.role] || '/'} replace />;
+
+  const set = (changes) => {
+    setForm({ ...form, ...changes });
+    setError('');
+    setField('');
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    const result = await login(form.email, form.password);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const loggedInUser = await usersApi.login(form.email.trim(), form.password);
+      onLogin(loggedInUser);
+      navigate(HOME_FOR[loggedInUser.role] || '/');
+    } catch (err) {
+      setError(errorText(err, 'Could not sign in.'));
     }
-    navigate(HOME_FOR[result.user.role] || '/');
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    const result = await register({ ...form, role });
-    if (!result.ok) {
-      setError(result.error);
-      setField(result.field || '');
+
+    const email = form.email.trim().toLowerCase();
+
+    if (form.name.trim().length < 2) {
+      setField('name');
+      setError('Tell us what to call you.');
       return;
     }
-    if (result.pending) {
-      setSubmitted(result.user);
+    if (!EMAIL_PATTERN.test(email)) {
+      setField('email');
+      setError('That does not look like an email address.');
       return;
     }
-    navigate(HOME_FOR[result.user.role] || '/');
+    if (form.password.length < MIN_PASSWORD) {
+      setField('password');
+      setError(`Passwords need at least ${MIN_PASSWORD} characters.`);
+      return;
+    }
+    if (form.password !== form.confirm) {
+      setField('confirm');
+      setError('The two passwords do not match.');
+      return;
+    }
+    if (!form.accepted) {
+      setField('accepted');
+      setError('You need to accept the terms to open an account.');
+      return;
+    }
+
+    try {
+      const newUser = await usersApi.register({
+        name: form.name.trim(),
+        email,
+        password: form.password,
+        role,
+        company: form.company || null,
+        title: form.title || null,
+      });
+
+      if (newUser.status === 'pending') {
+        setSubmitted(newUser);
+        return;
+      }
+
+      onLogin(newUser);
+      navigate(HOME_FOR[newUser.role] || '/');
+    } catch (err) {
+      setField('email');
+      setError(errorText(err, 'Could not create the account.'));
+    }
   };
 
   const fillDemo = (email) => {
@@ -83,7 +132,6 @@ const AuthPage = ({ mode }) => {
 
   const strength = strengthOf(form.password);
 
-  /* ---------- freelancer signed up, waiting on screening ---------- */
   if (submitted) {
     return (
       <div className="wm-auth">
@@ -111,13 +159,10 @@ const AuthPage = ({ mode }) => {
 
   return (
     <div className="wm-auth">
-      {/* ---------- brand side ---------- */}
       <aside className="wm-auth__brand">
         <div>
           <Link to="/" className="wm-auth__logo">Workmint.</Link>
-          <h2>
-            {isLogin ? 'Pick up where you left off.' : 'Money in escrow before the work starts.'}
-          </h2>
+          <h2>{isLogin ? 'Pick up where you left off.' : 'Money in escrow before the work starts.'}</h2>
           <p>
             {isLogin
               ? 'Your projects, milestones and escrow balance are exactly where you left them.'
@@ -143,7 +188,6 @@ const AuthPage = ({ mode }) => {
         </div>
       </aside>
 
-      {/* ---------- form side ---------- */}
       <div className="wm-auth__form">
         <div className="wm-auth__card">
           <Link to="/" className="wm-auth__back">
@@ -288,7 +332,10 @@ const AuthPage = ({ mode }) => {
                 {form.password && (
                   <div className="d-flex align-items-center gap-2 mt-2">
                     <div className="wm-strength">
-                      <span className={`wm-strength__fill wm-strength__fill--${strength.tone}`} style={{ width: `${(strength.score / 5) * 100}%` }} />
+                      <span
+                        className={`wm-strength__fill wm-strength__fill--${strength.tone}`}
+                        style={{ width: `${(strength.score / 5) * 100}%` }}
+                      />
                     </div>
                     <Pill tone={strength.tone}>{strength.label}</Pill>
                   </div>

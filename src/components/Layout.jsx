@@ -1,13 +1,10 @@
-import React, { useState, useContext } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dropdown } from 'react-bootstrap';
-import { UserContext } from '../data/AuthContext';
 import Icon from './Icon';
 import { Avatar } from './Shared';
-import { timeAgo } from '../data/freelancerData';
+import { timeAgo } from '../data/helpers';
 
-/* Nav is data, not JSX. Adding a screen means adding one line here plus one
-   case in the dashboard's renderContent(). */
 const NAV = {
   client: [
     { key: 'Overview', icon: 'grid' },
@@ -39,44 +36,28 @@ const NAV = {
 };
 
 const Layout = ({
+  user,
+  onLogout,
   title,
   subtitle,
   activeTab,
   setActiveTab,
   badges = {},
   notifications = [],
-  onReadNotifications,
   children,
 }) => {
   const navigate = useNavigate();
-  const { currentUser, logout } = useContext(UserContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleSignOut = () => {
-    // Signing out on a protected route means the guard redirects anyway, so
-    // send people to the sign-in screen deliberately rather than racing it.
-    logout();
+    onLogout();
     navigate('/login');
   };
 
-  // Route guard: no session, no workspace.
-  if (!currentUser) {
-    return (
-      <div className="wm-dashboard-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <div className="wm-card text-center" style={{ maxWidth: 380 }}>
-          <h5 className="fw-bold">You are signed out</h5>
-          <p className="text-muted small mb-3">Sign in to open your workspace.</p>
-          <button className="wm-btn wm-btn-primary" onClick={() => navigate('/login')}>Go to sign in</button>
-        </div>
-      </div>
-    );
-  }
-
-  const navItems = NAV[currentUser.role] || NAV.freelancer;
-  const unread = notifications.filter((n) => !n.read).length;
+  const navItems = NAV[user.role] || NAV.freelancer;
 
   const go = (key) => {
-    if (setActiveTab) setActiveTab(key);
+    setActiveTab(key);
     setDrawerOpen(false);
   };
 
@@ -88,10 +69,10 @@ const Layout = ({
         <div className="wm-sidebar-logo">Workmint.</div>
 
         <div className="wm-workspace-chip">
-          <Avatar name={currentUser.name} size={34} />
+          <Avatar name={user.name} size={34} />
           <div style={{ minWidth: 0 }}>
             <small>Workspace</small>
-            <strong>{currentUser.role}</strong>
+            <strong>{user.role}</strong>
           </div>
         </div>
 
@@ -136,15 +117,15 @@ const Layout = ({
           </div>
 
           <div className="wm-topbar__actions">
-            <Dropdown align="end" onToggle={(open) => open && onReadNotifications && onReadNotifications()}>
+            <Dropdown align="end">
               <Dropdown.Toggle as="button" className="wm-icon-btn" aria-label="Notifications">
                 <Icon name="bell" size={17} />
-                {unread > 0 && <span className="wm-icon-btn__dot" />}
+                {notifications.length > 0 && <span className="wm-icon-btn__dot" />}
               </Dropdown.Toggle>
               <Dropdown.Menu style={{ width: 320, padding: 0, borderRadius: 14, border: '1px solid var(--border-color)' }}>
                 <div className="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
                   <strong style={{ fontSize: '0.85rem' }}>Notifications</strong>
-                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>{unread} new</span>
+                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>{notifications.length} new</span>
                 </div>
                 <div style={{ maxHeight: 300, overflowY: 'auto' }}>
                   {notifications.length === 0 && (
@@ -152,10 +133,10 @@ const Layout = ({
                       Nothing yet. Activity on your contracts shows up here.
                     </div>
                   )}
-                  {notifications.slice(0, 8).map((n) => (
-                    <div key={n.id} className="px-3 py-2 border-bottom" style={{ fontSize: '0.83rem' }}>
-                      <div style={{ color: 'var(--slate-dark)' }}>{n.text}</div>
-                      <div className="text-muted" style={{ fontSize: '0.72rem' }}>{timeAgo(n.at)}</div>
+                  {notifications.slice(0, 8).map((item) => (
+                    <div key={item.id} className="px-3 py-2 border-bottom" style={{ fontSize: '0.83rem' }}>
+                      <div style={{ color: 'var(--slate-dark)' }}>{item.text}</div>
+                      <div className="text-muted" style={{ fontSize: '0.72rem' }}>{timeAgo(item.at)}</div>
                     </div>
                   ))}
                 </div>
@@ -164,10 +145,10 @@ const Layout = ({
 
             <div className="d-none d-sm-flex align-items-center gap-2">
               <div className="text-end lh-sm">
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{currentUser.name}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{currentUser.role}</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{user.name}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user.role}</div>
               </div>
-              <Avatar name={currentUser.name} size={38} />
+              <Avatar name={user.name} size={38} />
             </div>
           </div>
         </header>

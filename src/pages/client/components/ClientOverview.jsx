@@ -1,17 +1,17 @@
-import React from 'react';
 import { Row, Col, Button } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { StatCard, Pill, EmptyState, Avatar, EscrowBar } from '../../../components/Shared';
 import {
-  money, timeAgo, deadlineLabel, deadlineTone,
+  money, timeAgo, deadlineLabel, deadlineTone, orderRef,
   orderStatus, orderEscrow, orderReleased, orderTotal, clientNextAction, clientNeedsAttention,
-} from '../../../data/freelancerData';
+  activityOf,
+} from '../../../data/helpers';
 
 const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo }) => {
-  const active = orders.filter((o) => orderStatus(o).key !== 'completed');
-  const inEscrow = active.reduce((sum, o) => sum + orderEscrow(o), 0);
-  const totalSpent = orders.reduce((sum, o) => sum + orderReleased(o), 0);
-  const committed = active.reduce((sum, o) => sum + orderTotal(o), 0);
+  const active = orders.filter((order) => orderStatus(order).key !== 'completed');
+  const inEscrow = active.reduce((sum, order) => sum + orderEscrow(order), 0);
+  const totalSpent = orders.reduce((sum, order) => sum + orderReleased(order), 0);
+  const committed = active.reduce((sum, order) => sum + orderTotal(order), 0);
   const pendingProposals = proposals.filter((p) => p.status === 'Pending');
 
   const decisions = active
@@ -19,12 +19,10 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
     .map((order) => ({ order, action: clientNextAction(order) }))
     .sort((a, b) => new Date(a.order.deadline) - new Date(b.order.deadline));
 
-  const activity = [];
-  orders.forEach((o) => {
-    o.activity.forEach((a) => activity.push({ ...a, order: o }));
-  });
-  activity.sort((a, b) => new Date(b.at) - new Date(a.at));
-  const latestActivity = activity.slice(0, 6);
+  const latestActivity = orders
+    .flatMap((order) => activityOf(order).map((item) => ({ ...item, order })))
+    .sort((a, b) => new Date(b.at) - new Date(a.at))
+    .slice(0, 6);
 
   return (
     <>
@@ -91,14 +89,14 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
                   className="wm-thread w-100"
                   onClick={() => onOpenProject(order.id)}
                 >
-                  <Avatar name={order.freelancer.name} size={36} />
+                  <Avatar name={order.freelancer_name} size={36} />
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                       <span className="wm-thread__name">{order.project}</span>
                       <Pill tone={action.tone}>{action.label}</Pill>
                     </div>
                     <div className="wm-thread__preview" style={{ maxWidth: '100%' }}>
-                      {order.freelancer.name} &middot; {money(orderEscrow(order))} still in escrow
+                      {order.freelancer_name} &middot; {money(orderEscrow(order))} still in escrow
                     </div>
                     <div className="mt-2" style={{ maxWidth: 220 }}>
                       <EscrowBar released={orderReleased(order)} total={orderTotal(order)} />
@@ -121,10 +119,13 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
               <p className="text-muted small m-0">Nothing has happened yet.</p>
             ) : (
               <ul className="wm-timeline">
-                {latestActivity.map((a) => (
-                  <li key={a.id} className={a.actor === 'freelancer' ? 'is-client' : a.actor === 'system' ? 'is-system' : ''}>
-                    {a.text}
-                    <time>{a.order.ref} &middot; {timeAgo(a.at)}</time>
+                {latestActivity.map((item) => (
+                  <li
+                    key={`${item.order.id}-${item.id}`}
+                    className={item.actor === 'freelancer' ? 'is-client' : item.actor === 'system' ? 'is-system' : ''}
+                  >
+                    {item.text}
+                    <time>{orderRef(item.order)} &middot; {timeAgo(item.at)}</time>
                   </li>
                 ))}
               </ul>
@@ -150,7 +151,7 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
               />
             ) : (
               jobs.map((job) => {
-                const count = proposals.filter((p) => p.jobId === job.id && p.status === 'Pending').length;
+                const count = proposals.filter((p) => p.job_id === job.id && p.status === 'Pending').length;
                 return (
                   <div key={job.id} className="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
                     <div style={{ minWidth: 0 }}>

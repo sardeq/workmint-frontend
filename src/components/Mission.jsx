@@ -1,7 +1,4 @@
-import React from 'react';
 
-/* This used to be a prose block in the middle of the page. It works better as
-   the close: state the position, then give the reader the two doors out. */
 const Mission = ({ onJoin }) => (
   <section className="closing" id="mission">
     <div className="wm-container closing__grid">

@@ -19,7 +19,7 @@ in the `workmint-backend` repository — there is no local mock data.
 
 | Layer      | Choice                          |
 | ---------- | ------------------------------- |
-| Framework  | React                         |
+| Framework  | React                           |
 | Build tool | Vite                            |
 | Routing    | React Router                   |
 | UI kit     | React-Bootstrap 2 + Bootstrap 5 |
@@ -71,29 +71,26 @@ Vite only exposes variables prefixed with `VITE_`.
 
 ```
 src/
-├── main.jsx   
-├── App.jsx             
+├── main.jsx
+├── App.jsx
 │
 ├── api/
-│   ├── api.js     
-│   └── adapters.js    
+│   └── api.js
 │
 ├── data/
-│   ├── AuthContext.jsx     
-│   ├── WorkspaceContext.jsx 
-│   └── freelancerData.js  
+│   └── helpers.js
 │
-├── components/  
+├── components/
 │
 ├── pages/
-│   ├── auth/    
-│   ├── client/      
-│   ├── Freelancer/   
-│   └── Admin/    
+│   ├── auth/
+│   ├── client/
+│   ├── Freelancer/
+│   └── Admin/
 │
 └── style/
-    ├── index.css   
-    └── landing.css  
+    ├── index.css
+    └── landing.css
 ```
 
 ---
@@ -104,14 +101,8 @@ src/
    API server
        │  axios
        ▼
-   api/api.js  ──►  api/adapters.js
-       │
-       ▼
-   AuthContext   (who is signed in)
-       │
-       ▼
-   WorkspaceContext   (all the data for that person, plus every action)
-       │  useWorkspace()
+   api/api.js
+       │  called from useEffect
        ▼
    ClientDashboard / FreelancerDashboard / AdminDashboard
        │  props
@@ -119,16 +110,23 @@ src/
    tab components  (ProjectDetails, Earnings, DisputesList, …)
 ```
 
-Two contexts hold state, and the dashboards pass what each tab needs down as props.
+There is no Context. State lives in two places.
 
-**`AuthContext`** owns the signed-in user. It also loads the full user list, but only
-when an admin signs in, since only the admin screens need it.
+**`App.jsx`** owns the signed-in user. It reads `localStorage` once when the app starts,
+saves the user there on sign in, clears it on sign out, and passes `user`, `onLogin` and
+`onLogout` down as props.
 
-**`WorkspaceContext`** loads everything else the moment somebody signs in, scoped to
-them: a client gets their own orders and proposals, a freelancer gets theirs, an admin
-gets the whole platform. Every action a user can take: post a job, deliver a milestone,
-approve one, raise a dispute, is a function on this context. Each one calls the API,
-refreshes the affected rows, and shows a toast.
+**Each dashboard** loads its own data in a `useEffect` when it mounts, scoped to the
+signed-in user: a client asks for their orders and proposals, a freelancer for theirs, an
+admin for the whole platform. Every action a user can take — post a job, deliver a
+milestone, approve one, raise a dispute — is a plain `async` function in that dashboard.
+Each one calls the API, reloads the rows it changed, and shows a toast. The dashboards
+pass those functions down to the tab components as props.
+
+Rows are used exactly as the API returns them, so components read database column names
+directly (`hourly_rate`, `sender_role`, `due_date`) instead of a renamed copy.
+`src/data/helpers.js` holds the small pure functions that go on top: money formatting,
+dates, and the escrow totals derived from an order's milestones.
 
 ---
 
@@ -143,5 +141,15 @@ refreshes the affected rows, and shows a toast.
 | `/freelancer` | Freelancer dashboard| Signed-in freelancers|
 | `/admin`      | Admin dashboard     | Signed-in admins     |
 
-`ProtectedRoute` in `App.jsx` redirects anyone signed out to `/login`, and anyone on the
+`protectedPage()` in `App.jsx` redirects anyone signed out to `/login`, and anyone on the
 wrong dashboard to their own.
+
+## Demo accounts
+
+The seed data in the backend repository creates these, all with the password `demo1234`:
+
+| Email                  | Role       |
+| ---------------------- | ---------- |
+| `rana@techcorp.com`    | client     |
+| `sadeq@workmint.dev`   | freelancer |
+| `ops@workmint.com`     | admin      |

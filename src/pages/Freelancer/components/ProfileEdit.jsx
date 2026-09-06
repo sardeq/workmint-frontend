@@ -1,53 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Row, Col, Form, Button, ProgressBar } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, Avatar } from '../../../components/Shared';
-import { money } from '../../../data/freelancerData';
+import { money } from '../../../data/helpers';
 
 const MIN_BIO = 100;
 
 const ProfileEdit = ({ profile, onSave }) => {
-  const [form, setForm] = useState(() => profile || { skills: [] });
+  const [form, setForm] = useState(profile || { skills: [] });
   const [skillInput, setSkillInput] = useState('');
   const [errors, setErrors] = useState({});
 
-  useEffect(() => { if (profile) setForm(profile); }, [profile]);
+  useEffect(() => {
+    if (profile) setForm({ ...profile, skills: profile.skills || [] });
+  }, [profile]);
 
   if (!profile) return null;
 
-  const set = (patch) => setForm({ ...form, ...patch });
-  const dirty = JSON.stringify(form) !== JSON.stringify(profile);
+  const set = (changes) => setForm({ ...form, ...changes });
+
+  const dirty = JSON.stringify(form) !== JSON.stringify({ ...profile, skills: profile.skills || [] });
 
   const addSkill = () => {
     const value = skillInput.trim();
-    if (!value || form.skills.includes(value)) return setSkillInput('');
-    set({ skills: [...form.skills, value] });
+    if (value && !form.skills.includes(value)) {
+      set({ skills: [...form.skills, value] });
+    }
     setSkillInput('');
   };
 
-  const removeSkill = (skill) => set({ skills: form.skills.filter((s) => s !== skill) });
+  const removeSkill = (skill) => set({ skills: form.skills.filter((item) => item !== skill) });
 
   const checks = [
     { label: 'Name and title', done: Boolean(form.name && form.title) },
     { label: `Bio of ${MIN_BIO}+ characters`, done: (form.bio || '').length >= MIN_BIO },
     { label: 'Three or more skills', done: form.skills.length >= 3 },
-    { label: 'Hourly rate set', done: Number(form.rate) > 0 },
+    { label: 'Hourly rate set', done: Number(form.hourly_rate) > 0 },
     { label: 'Location and timezone', done: Boolean(form.location && form.timezone) },
     { label: 'Languages listed', done: Boolean(form.languages) },
   ];
-  const strength = Math.round((checks.filter((c) => c.done).length / checks.length) * 100);
+
+  const strength = Math.round((checks.filter((check) => check.done).length / checks.length) * 100);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const next = {};
+
     if (!form.name.trim()) next.name = 'Clients need a name to address you by.';
     if (!form.title.trim()) next.title = 'Say what you do in one line.';
-    if (Number(form.rate) < 5) next.rate = 'Set a rate of at least $5/hr.';
+    if (Number(form.hourly_rate) < 5) next.hourly_rate = 'Set a rate of at least $5/hr.';
     if ((form.bio || '').length < MIN_BIO) next.bio = `Write at least ${MIN_BIO} characters.`;
     if (form.skills.length === 0) next.skills = 'Add at least one skill.';
 
     setErrors(next);
-    if (Object.keys(next).length === 0) onSave({ ...form, rate: Number(form.rate) });
+
+    if (Object.keys(next).length === 0) {
+      onSave({ ...form, hourly_rate: Number(form.hourly_rate) });
+    }
   };
 
   return (
@@ -65,7 +74,7 @@ const ProfileEdit = ({ profile, onSave }) => {
                 <Form.Group>
                   <Form.Label>Full name</Form.Label>
                   <Form.Control
-                    value={form.name}
+                    value={form.name || ''}
                     isInvalid={Boolean(errors.name)}
                     onChange={(e) => set({ name: e.target.value })}
                   />
@@ -76,7 +85,7 @@ const ProfileEdit = ({ profile, onSave }) => {
                 <Form.Group>
                   <Form.Label>Professional title</Form.Label>
                   <Form.Control
-                    value={form.title}
+                    value={form.title || ''}
                     isInvalid={Boolean(errors.title)}
                     onChange={(e) => set({ title: e.target.value })}
                   />
@@ -88,31 +97,32 @@ const ProfileEdit = ({ profile, onSave }) => {
                 <Form.Group>
                   <Form.Label>Hourly rate ($)</Form.Label>
                   <Form.Control
-                    type="number" min="5"
-                    value={form.rate}
-                    isInvalid={Boolean(errors.rate)}
-                    onChange={(e) => set({ rate: e.target.value })}
+                    type="number"
+                    min="5"
+                    value={form.hourly_rate || ''}
+                    isInvalid={Boolean(errors.hourly_rate)}
+                    onChange={(e) => set({ hourly_rate: e.target.value })}
                   />
-                  <Form.Control.Feedback type="invalid">{errors.rate}</Form.Control.Feedback>
+                  <Form.Control.Feedback type="invalid">{errors.hourly_rate}</Form.Control.Feedback>
                 </Form.Group>
               </Col>
               <Col md={5}>
                 <Form.Group>
                   <Form.Label>Location</Form.Label>
-                  <Form.Control value={form.location} onChange={(e) => set({ location: e.target.value })} />
+                  <Form.Control value={form.location || ''} onChange={(e) => set({ location: e.target.value })} />
                 </Form.Group>
               </Col>
               <Col md={3}>
                 <Form.Group>
                   <Form.Label>Timezone</Form.Label>
-                  <Form.Control value={form.timezone} onChange={(e) => set({ timezone: e.target.value })} />
+                  <Form.Control value={form.timezone || ''} onChange={(e) => set({ timezone: e.target.value })} />
                 </Form.Group>
               </Col>
 
               <Col md={12}>
                 <Form.Group>
                   <Form.Label>Languages</Form.Label>
-                  <Form.Control value={form.languages} onChange={(e) => set({ languages: e.target.value })} />
+                  <Form.Control value={form.languages || ''} onChange={(e) => set({ languages: e.target.value })} />
                 </Form.Group>
               </Col>
 
@@ -120,8 +130,9 @@ const ProfileEdit = ({ profile, onSave }) => {
                 <Form.Group>
                   <Form.Label>Bio</Form.Label>
                   <Form.Control
-                    as="textarea" rows={4}
-                    value={form.bio}
+                    as="textarea"
+                    rows={4}
+                    value={form.bio || ''}
                     isInvalid={Boolean(errors.bio)}
                     onChange={(e) => set({ bio: e.target.value })}
                   />
@@ -183,15 +194,15 @@ const ProfileEdit = ({ profile, onSave }) => {
               <span className="wm-num" style={{ fontSize: '1.8rem' }}>{strength}%</span>
               <div className="flex-grow-1"><ProgressBar now={strength} style={{ height: 8 }} /></div>
             </div>
-            {checks.map((c) => (
-              <div key={c.label} className="d-flex align-items-center gap-2 py-1" style={{ fontSize: '0.85rem' }}>
+            {checks.map((check) => (
+              <div key={check.label} className="d-flex align-items-center gap-2 py-1" style={{ fontSize: '0.85rem' }}>
                 <span
-                  className={`wm-stat__icon wm-stat__icon--${c.done ? 'success' : 'muted'}`}
+                  className={`wm-stat__icon wm-stat__icon--${check.done ? 'success' : 'muted'}`}
                   style={{ width: 20, height: 20 }}
                 >
-                  <Icon name={c.done ? 'check' : 'close'} size={11} />
+                  <Icon name={check.done ? 'check' : 'close'} size={11} />
                 </span>
-                <span style={{ color: c.done ? 'var(--text-main)' : 'var(--text-muted)' }}>{c.label}</span>
+                <span style={{ color: check.done ? 'var(--text-main)' : 'var(--text-muted)' }}>{check.label}</span>
               </div>
             ))}
           </div>
@@ -209,24 +220,30 @@ const ProfileEdit = ({ profile, onSave }) => {
             <div className="d-flex flex-wrap gap-2 mb-3">
               <Pill tone={form.available ? 'success' : 'muted'}>{form.available ? 'Available now' : 'Unavailable'}</Pill>
               <Pill tone="muted">{form.location || 'Location'}</Pill>
-              <Pill tone="muted">Replies in ~{form.responseHours}h</Pill>
+              <Pill tone="muted">Replies in ~{form.response_hours || 4}h</Pill>
             </div>
 
             <div className="wm-num mb-2" style={{ fontSize: '1.3rem' }}>
-              {money(Number(form.rate) || 0)}<span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.9rem' }}>/hr</span>
+              {money(form.hourly_rate)}
+              <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.9rem' }}>/hr</span>
             </div>
             <p className="text-muted" style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
               {form.bio || 'Your bio appears here.'}
             </p>
             <div className="wm-chips">
-              {form.skills.slice(0, 6).map((s) => <span className="wm-tag" key={s}>{s}</span>)}
+              {form.skills.slice(0, 6).map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
             </div>
           </div>
         </Col>
       </Row>
 
       <div className="d-flex justify-content-end gap-2 mt-3">
-        <Button variant="outline-secondary" type="button" disabled={!dirty} onClick={() => { setForm(profile); setErrors({}); }}>
+        <Button
+          variant="outline-secondary"
+          type="button"
+          disabled={!dirty}
+          onClick={() => { setForm({ ...profile, skills: profile.skills || [] }); setErrors({}); }}
+        >
           Discard changes
         </Button>
         <Button variant="primary" type="submit" disabled={!dirty}>Save profile</Button>

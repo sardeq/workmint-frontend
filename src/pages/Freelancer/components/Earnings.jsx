@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Row, Col, Button, Table, Modal, Form, Alert } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { StatCard, Pill, EmptyState } from '../../../components/Shared';
-import { money, netOf, shortDate, timeAgo, orderStatus, orderEscrow, FEE_RATE } from '../../../data/freelancerData';
+import {
+  money, num, netOf, shortDate, timeAgo, orderRef,
+  orderStatus, orderEscrow, milestonesOf, FEE_RATE,
+} from '../../../data/helpers';
 
 const Earnings = ({ orders, withdrawals, onWithdraw }) => {
   const [show, setShow] = useState(false);
@@ -10,67 +13,73 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
   const [method, setMethod] = useState('Bank transfer');
   const [error, setError] = useState('');
 
-  /* Every approved milestone is a credit, every withdrawal is a debit.
-     One ledger, so the numbers in the cards can always be traced to a row. */
-  const credits = [];
-  orders.forEach((order) => {
-    order.milestones.forEach((m) => {
-      if (m.status !== 'approved') return;
-      credits.push({
-        id: `${order.id}-${m.id}`,
-        at: m.approvedOn || order.deadline,
-        label: m.title,
-        sub: `${order.client} - ${order.ref}`,
-        gross: m.amount,
-        net: netOf(m.amount),
+  const credits = orders.flatMap((order) =>
+    milestonesOf(order)
+      .filter((milestone) => milestone.status === 'approved')
+      .map((milestone) => ({
+        id: `C-${order.id}-${milestone.id}`,
+        at: milestone.approved_on || order.deadline,
+        label: milestone.title,
+        sub: `${order.client} - ${orderRef(order)}`,
+        gross: num(milestone.amount),
+        net: netOf(milestone.amount),
         kind: 'credit',
-      });
-    });
-  });
+      }))
+  );
 
-  const debits = withdrawals.map((w) => ({
-    id: w.id,
-    at: w.at,
-    label: `Withdrawal to ${w.method.toLowerCase()}`,
-    sub: w.status,
+  const debits = withdrawals.map((withdrawal) => ({
+    id: `D-${withdrawal.id}`,
+    at: withdrawal.at,
+    label: `Withdrawal to ${withdrawal.method.toLowerCase()}`,
+    sub: withdrawal.status,
     gross: null,
-    net: -w.amount,
+    net: -num(withdrawal.amount),
     kind: 'debit',
   }));
 
   const ledger = [...credits, ...debits].sort((a, b) => new Date(b.at) - new Date(a.at));
 
-  const lifetimeNet = credits.reduce((sum, c) => sum + c.net, 0);
-  const paidOut = withdrawals.reduce((sum, w) => sum + w.amount, 0);
+  const lifetimeNet = credits.reduce((sum, row) => sum + row.net, 0);
+  const paidOut = withdrawals.reduce((sum, row) => sum + num(row.amount), 0);
   const available = lifetimeNet - paidOut;
-  const inEscrow = orders
-    .filter((o) => orderStatus(o).key !== 'completed')
-    .reduce((sum, o) => sum + orderEscrow(o), 0);
-  const feesPaid = credits.reduce((sum, c) => sum + (c.gross - c.net), 0);
+  const feesPaid = credits.reduce((sum, row) => sum + (row.gross - row.net), 0);
 
-  /* Last six months of released earnings, drawn with divs. */
+  const inEscrow = orders
+    .filter((order) => orderStatus(order).key !== 'completed')
+    .reduce((sum, order) => sum + orderEscrow(order), 0);
+
   const months = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i, 1);
+    const date = new Date();
+    date.setMonth(date.getMonth() - i, 1);
     months.push({
-      key: `${d.getFullYear()}-${d.getMonth()}`,
-      label: d.toLocaleDateString('en-US', { month: 'short' }),
+      key: `${date.getFullYear()}-${date.getMonth()}`,
+      label: date.toLocaleDateString('en-US', { month: 'short' }),
       total: 0,
     });
   }
-  credits.forEach((c) => {
-    const d = new Date(c.at);
-    const bucket = months.find((m) => m.key === `${d.getFullYear()}-${d.getMonth()}`);
-    if (bucket) bucket.total += c.net;
+
+  credits.forEach((credit) => {
+    const date = new Date(credit.at);
+    const bucket = months.find((month) => month.key === `${date.getFullYear()}-${date.getMonth()}`);
+    if (bucket) bucket.total += credit.net;
   });
-  const peak = Math.max(...months.map((m) => m.total), 1);
+
+  const peak = Math.max(...months.map((month) => month.total), 1);
 
   const handleWithdraw = (e) => {
     e.preventDefault();
     const value = Number(amount);
-    if (!value || value <= 0) return setError('Enter an amount.');
-    if (value > available) return setError(`You can withdraw up to ${money(available)} right now.`);
+
+    if (!value || value <= 0) {
+      setError('Enter an amount.');
+      return;
+    }
+    if (value > available) {
+      setError(`You can withdraw up to ${money(available)} right now.`);
+      return;
+    }
+
     onWithdraw(value, method);
     setShow(false);
     setAmount('');
@@ -110,10 +119,10 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
           <div className="wm-panel">
             <div className="wm-eyebrow mb-3">Released per month</div>
             <div className="wm-bars">
-              {months.map((m) => (
-                <div className="wm-bars__col" key={m.key} title={money(m.total)}>
-                  <div className="wm-bars__bar" style={{ height: `${Math.max((m.total / peak) * 100, 3)}%` }} />
-                  <span className="wm-bars__label">{m.label}</span>
+              {months.map((month) => (
+                <div className="wm-bars__col" key={month.key} title={money(month.total)}>
+                  <div className="wm-bars__bar" style={{ height: `${Math.max((month.total / peak) * 100, 3)}%` }} />
+                  <span className="wm-bars__label">{month.label}</span>
                 </div>
               ))}
             </div>
@@ -188,7 +197,10 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
             <Form.Group className="mb-3">
               <Form.Label>Amount</Form.Label>
               <Form.Control
-                type="number" min="1" max={available} placeholder="0"
+                type="number"
+                min="1"
+                max={available}
+                placeholder="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />

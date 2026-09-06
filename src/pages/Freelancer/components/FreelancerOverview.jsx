@@ -1,45 +1,38 @@
-import React from 'react';
 import { Row, Col, Button } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { StatCard, Pill, EmptyState, Avatar, EscrowBar } from '../../../components/Shared';
 import {
-  money, netOf, timeAgo, deadlineLabel, deadlineTone,
+  money, num, netOf, timeAgo, deadlineLabel, deadlineTone, orderRef,
   orderStatus, orderEscrow, orderReleased, orderTotal, nextAction, needsAttention,
-} from '../../../data/freelancerData';
+  milestonesOf, activityOf,
+} from '../../../data/helpers';
 
 const FreelancerOverview = ({ orders, proposals, withdrawals, profile, onOpenOrder, onGo }) => {
-  const active = orders.filter((o) => orderStatus(o).key !== 'completed');
+  const active = orders.filter((order) => orderStatus(order).key !== 'completed');
 
-  const inEscrow = active.reduce((sum, o) => sum + orderEscrow(o), 0);
-  const lifetimeNet = orders.reduce((sum, o) => sum + netOf(orderReleased(o)), 0);
-  const paidOut = withdrawals.reduce((sum, w) => sum + w.amount, 0);
+  const inEscrow = active.reduce((sum, order) => sum + orderEscrow(order), 0);
+  const lifetimeNet = orders.reduce((sum, order) => sum + netOf(orderReleased(order)), 0);
+  const paidOut = withdrawals.reduce((sum, item) => sum + num(item.amount), 0);
   const available = lifetimeNet - paidOut;
 
   const openProposals = proposals.filter((p) => p.status === 'Pending' || p.status === 'Interviewing');
   const interviewing = proposals.filter((p) => p.status === 'Interviewing').length;
 
-  // Orders waiting on you, most urgent deadline first.
   const todo = active
     .filter(needsAttention)
     .map((order) => ({ order, action: nextAction(order) }))
     .filter((row) => row.action)
     .sort((a, b) => new Date(a.order.deadline) - new Date(b.order.deadline));
 
-  const activity = [];
-  orders.forEach((o) => {
-    o.activity.forEach((a) => activity.push({ ...a, order: o }));
-  });
-  activity.sort((a, b) => new Date(b.at) - new Date(a.at));
-  const latestActivity = activity.slice(0, 6);
+  const latestActivity = orders
+    .flatMap((order) => activityOf(order).map((item) => ({ ...item, order })))
+    .sort((a, b) => new Date(b.at) - new Date(a.at))
+    .slice(0, 6);
 
-  /* Milestones still to be delivered, soonest deadline first. */
-  const upcoming = [];
-  active.forEach((o) => {
-    o.milestones.forEach((m) => {
-      if (m.status !== 'approved') upcoming.push({ m, o });
-    });
-  });
-  upcoming.sort((a, b) => new Date(a.m.dueDate) - new Date(b.m.dueDate));
+  const upcoming = active
+    .flatMap((order) => milestonesOf(order).map((milestone) => ({ milestone, order })))
+    .filter((row) => row.milestone.status !== 'approved')
+    .sort((a, b) => new Date(a.milestone.due_date) - new Date(b.milestone.due_date));
 
   return (
     <>
@@ -136,10 +129,13 @@ const FreelancerOverview = ({ orders, proposals, withdrawals, profile, onOpenOrd
               <p className="text-muted small m-0">Nothing has happened yet.</p>
             ) : (
               <ul className="wm-timeline">
-                {latestActivity.map((a) => (
-                  <li key={a.id} className={a.actor === 'client' ? 'is-client' : a.actor === 'system' ? 'is-system' : ''}>
-                    {a.text}
-                    <time>{a.order.ref} &middot; {timeAgo(a.at)}</time>
+                {latestActivity.map((item) => (
+                  <li
+                    key={`${item.order.id}-${item.id}`}
+                    className={item.actor === 'client' ? 'is-client' : item.actor === 'system' ? 'is-system' : ''}
+                  >
+                    {item.text}
+                    <time>{orderRef(item.order)} &middot; {timeAgo(item.at)}</time>
                   </li>
                 ))}
               </ul>
@@ -155,20 +151,18 @@ const FreelancerOverview = ({ orders, proposals, withdrawals, profile, onOpenOrd
             {active.length === 0 ? (
               <p className="text-muted small m-0">No active orders.</p>
             ) : (
-              upcoming
-                .slice(0, 5)
-                .map(({ m, o }) => (
-                  <div key={m.id} className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{m.title}</div>
-                      <div className="text-muted" style={{ fontSize: '0.78rem' }}>{o.client}</div>
-                    </div>
-                    <div className="text-end">
-                      <div className="wm-num" style={{ fontSize: '0.9rem' }}>{money(m.amount)}</div>
-                      <Pill tone={deadlineTone(m.dueDate)}>{deadlineLabel(m.dueDate)}</Pill>
-                    </div>
+              upcoming.slice(0, 5).map(({ milestone, order }) => (
+                <div key={milestone.id} className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{milestone.title}</div>
+                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>{order.client}</div>
                   </div>
-                ))
+                  <div className="text-end">
+                    <div className="wm-num" style={{ fontSize: '0.9rem' }}>{money(milestone.amount)}</div>
+                    <Pill tone={deadlineTone(milestone.due_date)}>{deadlineLabel(milestone.due_date)}</Pill>
+                  </div>
+                </div>
+              ))
             )}
           </div>
 
@@ -185,7 +179,8 @@ const FreelancerOverview = ({ orders, proposals, withdrawals, profile, onOpenOrd
                 {profile && profile.available ? 'Available for work' : 'Not taking work'}
               </Pill>
               <span className="wm-num" style={{ fontSize: '0.95rem' }}>
-                {money(profile ? profile.rate : 0)}<span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>/hr</span>
+                {money(profile ? profile.hourly_rate : 0)}
+                <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>/hr</span>
               </span>
             </div>
             <div className="d-grid gap-2">

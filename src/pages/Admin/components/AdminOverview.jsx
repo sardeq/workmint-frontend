@@ -1,24 +1,20 @@
-import React from 'react';
 import { Row, Col, Button } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, EmptyState, Avatar } from '../../../components/Shared';
 import AdminStats from './AdminStats';
 import {
-  money, timeAgo, orderStatus, orderEscrow, orderTotal, DISPUTE_STATUS,
-} from '../../../data/freelancerData';
+  money, timeAgo, orderRef, orderStatus, orderEscrow, orderTotal, activityOf, DISPUTE_STATUS,
+} from '../../../data/helpers';
 
 const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispute, onGo }) => {
-  const openDisputes = disputes.filter((d) => d.status !== 'Resolved');
-  const pendingUsers = users.filter((u) => u.status === 'pending');
-  const activeOrders = orders.filter((o) => orderStatus(o).key !== 'completed');
+  const openDisputes = disputes.filter((dispute) => dispute.status !== 'Resolved');
+  const pendingUsers = users.filter((person) => person.status === 'pending');
+  const activeOrders = orders.filter((order) => orderStatus(order).key !== 'completed');
 
-  /* Everything happening on the platform, newest first. */
-  const activity = [];
-  orders.forEach((o) => {
-    o.activity.forEach((a) => activity.push({ ...a, order: o }));
-  });
-  activity.sort((a, b) => new Date(b.at) - new Date(a.at));
-  const latestActivity = activity.slice(0, 8);
+  const latestActivity = orders
+    .flatMap((order) => activityOf(order).map((item) => ({ ...item, order })))
+    .sort((a, b) => new Date(b.at) - new Date(a.at))
+    .slice(0, 8);
 
   const biggest = [...activeOrders]
     .sort((a, b) => orderEscrow(b) - orderEscrow(a))
@@ -62,9 +58,9 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
                   </span>
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
                     <div className="d-flex align-items-center gap-2 flex-wrap">
-                      <span className="wm-thread__name">{dispute.id}</span>
+                      <span className="wm-thread__name">Case {dispute.id}</span>
                       <Pill tone={DISPUTE_STATUS[dispute.status].tone}>{dispute.status}</Pill>
-                      <Pill tone="muted">raised by the {dispute.raisedBy}</Pill>
+                      <Pill tone="muted">raised by the {dispute.raised_by}</Pill>
                     </div>
                     <div className="wm-thread__preview" style={{ maxWidth: '100%' }}>{dispute.reason}</div>
                     <div className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
@@ -73,7 +69,7 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
                   </div>
                   <div className="text-end">
                     <div className="wm-num">{money(dispute.amount)}</div>
-                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{timeAgo(dispute.openedAt)}</div>
+                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{timeAgo(dispute.opened_at)}</div>
                   </div>
                 </button>
               ))
@@ -88,10 +84,13 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
               <p className="text-muted small m-0">Nothing has happened yet.</p>
             ) : (
               <ul className="wm-timeline">
-                {latestActivity.map((a) => (
-                  <li key={a.id} className={a.actor === 'system' ? 'is-system' : a.actor === 'client' ? 'is-client' : ''}>
-                    {a.text}
-                    <time>{a.order.ref} &middot; {timeAgo(a.at)}</time>
+                {latestActivity.map((item) => (
+                  <li
+                    key={`${item.order.id}-${item.id}`}
+                    className={item.actor === 'system' ? 'is-system' : item.actor === 'client' ? 'is-client' : ''}
+                  >
+                    {item.text}
+                    <time>{orderRef(item.order)} &middot; {timeAgo(item.at)}</time>
                   </li>
                 ))}
               </ul>
@@ -111,14 +110,14 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
             {pendingUsers.length === 0 ? (
               <EmptyState icon="check" title="Queue is clear" body="No accounts are waiting on screening." />
             ) : (
-              pendingUsers.slice(0, 4).map((user) => (
-                <div key={user.id} className="d-flex align-items-center gap-2 px-4 py-3 border-bottom">
-                  <Avatar name={user.name} size={34} />
+              pendingUsers.slice(0, 4).map((person) => (
+                <div key={person.id} className="d-flex align-items-center gap-2 px-4 py-3 border-bottom">
+                  <Avatar name={person.name} size={34} />
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '0.89rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{user.name}</div>
-                    <div className="text-muted" style={{ fontSize: '0.77rem' }}>{user.title}</div>
+                    <div style={{ fontSize: '0.89rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{person.name}</div>
+                    <div className="text-muted" style={{ fontSize: '0.77rem' }}>{person.title}</div>
                   </div>
-                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>{timeAgo(user.joinedAt)}</span>
+                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>{timeAgo(person.joined_at)}</span>
                 </div>
               ))
             )}
@@ -140,7 +139,7 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '0.89rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{order.project}</div>
                     <div className="text-muted" style={{ fontSize: '0.77rem' }}>
-                      {order.client} &rarr; {order.freelancer.name}
+                      {order.client} &rarr; {order.freelancer_name}
                     </div>
                   </div>
                   <div className="text-end">
@@ -155,7 +154,7 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
           <div className="d-flex gap-2 mt-3">
             <Pill tone="muted">{jobs.length} open jobs</Pill>
             <Pill tone="muted">{proposals.filter((p) => p.status === 'Pending').length} live proposals</Pill>
-            <Pill tone="muted">{users.filter((u) => u.status === 'active').length} active accounts</Pill>
+            <Pill tone="muted">{users.filter((person) => person.status === 'active').length} active accounts</Pill>
           </div>
         </Col>
       </Row>

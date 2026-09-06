@@ -1,9 +1,6 @@
-import React from 'react';
+import { Toast, ToastContainer } from 'react-bootstrap';
 import Icon from './Icon';
-import { initials } from '../data/freelancerData';
-
-/* Small building blocks shared by every freelancer screen, so a status pill
-   or an empty state looks identical wherever it shows up. */
+import { initials } from '../data/helpers';
 
 export const Pill = ({ tone = 'muted', children, className = '' }) => (
   <span className={`wm-pill wm-pill--${tone} ${className}`}>{children}</span>
@@ -50,13 +47,32 @@ export const EmptyState = ({ icon = 'inbox', title, body, action }) => (
   </div>
 );
 
-/* A segmented bar: released money on the left, escrow on the right.
-   Used on the overview, the orders list and the workspace header. */
 export const EscrowBar = ({ released, total }) => {
-  const pct = total === 0 ? 0 : Math.round((released / total) * 100);
+  const percent = total === 0 ? 0 : Math.round((released / total) * 100);
   return (
-    <div className="wm-escrow-bar" role="img" aria-label={`${pct}% released`}>
-      <div className="wm-escrow-bar__fill" style={{ width: `${pct}%` }} />
+    <div className="wm-escrow-bar" role="img" aria-label={`${percent}% released`}>
+      <div className="wm-escrow-bar__fill" style={{ width: `${percent}%` }} />
     </div>
   );
 };
+
+export const ToastMessage = ({ toast, onClose }) => (
+  <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 1080 }}>
+    {toast && (
+      <Toast onClose={onClose} show autohide delay={3200}>
+        <Toast.Body className="d-flex align-items-center gap-2" style={{ fontSize: '0.88rem' }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              flexShrink: 0,
+              background: toast.tone === 'warn' ? 'var(--amber)' : 'var(--mint-primary)',
+            }}
+          />
+          {toast.text}
+        </Toast.Body>
+      </Toast>
+    )}
+  </ToastContainer>
+);

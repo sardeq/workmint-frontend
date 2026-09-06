@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Row, Col, Form, Button, Alert } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill } from '../../../components/Shared';
-import { money, grossWithClientFee, CLIENT_FEE_RATE } from '../../../data/freelancerData';
+import { money, grossWithClientFee, CLIENT_FEE_RATE } from '../../../data/helpers';
 
 const BLANK = { title: '', level: 'Intermediate', budget: '', days: '', description: '', skills: [] };
 const MIN_DESCRIPTION = 80;
@@ -12,16 +12,17 @@ const PostJobForm = ({ onPostJob }) => {
   const [skillInput, setSkillInput] = useState('');
   const [errors, setErrors] = useState({});
 
-  const set = (patch) => setForm({ ...form, ...patch });
+  const set = (changes) => setForm({ ...form, ...changes });
 
   const addSkill = () => {
     const value = skillInput.trim();
-    if (!value || form.skills.includes(value)) return setSkillInput('');
-    set({ skills: [...form.skills, value] });
+    if (value && !form.skills.includes(value)) {
+      set({ skills: [...form.skills, value] });
+    }
     setSkillInput('');
   };
 
-  const removeSkill = (skill) => set({ skills: form.skills.filter((s) => s !== skill) });
+  const removeSkill = (skill) => set({ skills: form.skills.filter((item) => item !== skill) });
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -155,7 +156,7 @@ const PostJobForm = ({ onPostJob }) => {
             <div className="wm-eyebrow mb-3">How freelancers will see it</div>
             <div className="wm-job">
               <h6 className="wm-job__title">{form.title || 'Your job title'}</h6>
-              <div className="wm-job__meta">TechCorp &middot; 4.9 rating &middot; 14 jobs posted</div>
+              <div className="wm-job__meta">Preview of your listing</div>
 
               <div className="d-flex align-items-baseline gap-2 mt-2">
                 <span className="wm-num" style={{ fontSize: '1.1rem' }}>{money(budget)}</span>
@@ -170,7 +171,7 @@ const PostJobForm = ({ onPostJob }) => {
               </p>
 
               <div className="wm-chips">
-                {form.skills.map((s) => <span className="wm-tag" key={s}>{s}</span>)}
+                {form.skills.map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
               </div>
             </div>
           </div>

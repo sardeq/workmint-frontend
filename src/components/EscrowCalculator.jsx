@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FEE_RATE } from '../data/freelancerData';
+import { FEE_RATE, CLIENT_FEE_RATE } from '../data/helpers';
 
-const CLIENT_FEE_RATE = 0.03;
 
 const CURRENCIES = [
   { code: 'JOD', label: 'Jordanian dinar', fallback: 0.709 },
