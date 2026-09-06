@@ -63,7 +63,7 @@ Vite only exposes variables prefixed with `VITE_`.
 
 | Variable        | Default                     | Purpose                    |
 | --------------- | --------------------------- | -------------------------- |
-| `VITE_API_URL`  | `http://localhost:5000/api` | Base URL of the API server |
+| `API_URL`  | `http://localhost:5000/api` | Base URL of the API server |
 
 ---
 
