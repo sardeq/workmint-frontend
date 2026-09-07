@@ -3,62 +3,48 @@ import { Row, Col, Form, InputGroup, Button } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { EmptyState, StatCard } from '../../../components/Shared';
 import ProjectCard from './ProjectCard';
-import {
-  money, orderStatus, orderEscrow, orderReleased, clientNeedsAttention, byUrgency, orderRef,
-} from '../../../data/helpers';
+import { money, isLive, escrowOf, releasedOf, sumBy, clientAction } from '../../../data/helpers';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'decision', label: 'Needs a decision' },
   { key: 'progress', label: 'With freelancer' },
-  { key: 'completed', label: 'Completed' },
+  { key: 'done', label: 'Finished' },
 ];
 
-const ClientProjects = ({ orders, onOpen, onGo }) => {
+const ClientProjects = ({ contracts, onOpen, onGo }) => {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
-  const matches = (order) => {
-    const key = orderStatus(order).key;
-    if (filter === 'completed') return key === 'completed';
-    if (filter === 'decision') return clientNeedsAttention(order);
-    if (filter === 'progress') return key !== 'completed' && !clientNeedsAttention(order);
+  const matchesFilter = (contract) => {
+    if (filter === 'done') return !isLive(contract);
+    if (filter === 'decision') return Boolean(clientAction(contract));
+    if (filter === 'progress') return isLive(contract) && !clientAction(contract);
     return true;
   };
 
-  const visible = orders
-    .filter(matches)
-    .filter((order) => {
-      const term = search.toLowerCase();
-      return (
-        order.project.toLowerCase().includes(term) ||
-        order.freelancer_name.toLowerCase().includes(term) ||
-        orderRef(order).toLowerCase().includes(term)
-      );
-    })
-    .sort(byUrgency('client'));
+  const matchesSearch = (contract) => {
+    const term = search.toLowerCase();
+    return (
+      contract.title.toLowerCase().includes(term) ||
+      contract.freelancer_name.toLowerCase().includes(term)
+    );
+  };
 
-  const active = orders.filter((order) => orderStatus(order).key !== 'completed');
+  const visible = contracts.filter(matchesFilter).filter(matchesSearch);
+  const live = contracts.filter(isLive);
 
   return (
     <>
       <Row className="g-3 mb-4">
         <Col sm={4}>
-          <StatCard label="Active" value={active.length} icon="briefcase" tone="info" sub="Contracts running" />
+          <StatCard label="Active" value={live.length} icon="briefcase" tone="info" sub="Contracts running" />
         </Col>
         <Col sm={4}>
-          <StatCard
-            label="In escrow" icon="lock" tone="warn"
-            value={money(active.reduce((sum, order) => sum + orderEscrow(order), 0))}
-            sub="Yours until you approve"
-          />
+          <StatCard label="In escrow" value={money(sumBy(live, escrowOf))} icon="lock" tone="warn" sub="Yours until you approve" />
         </Col>
         <Col sm={4}>
-          <StatCard
-            label="Released" icon="check" tone="success"
-            value={money(orders.reduce((sum, order) => sum + orderReleased(order), 0))}
-            sub="Across all projects"
-          />
+          <StatCard label="Released" value={money(sumBy(contracts, releasedOf))} icon="check" tone="success" sub="Across all projects" />
         </Col>
       </Row>
 
@@ -99,9 +85,9 @@ const ClientProjects = ({ orders, onOpen, onGo }) => {
         </div>
       ) : (
         <Row className="g-3">
-          {visible.map((order) => (
-            <Col md={6} xl={4} key={order.id}>
-              <ProjectCard project={order} onOpen={onOpen} />
+          {visible.map((contract) => (
+            <Col md={6} xl={4} key={contract.id}>
+              <ProjectCard contract={contract} onOpen={onOpen} />
             </Col>
           ))}
         </Row>

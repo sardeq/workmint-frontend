@@ -7,11 +7,10 @@ import { money, num, timeAgo } from '../../../data/helpers';
 
 const LEVEL_TONE = { Entry: 'muted', Intermediate: 'info', Expert: 'success' };
 
-const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) => {
+const AvailableJobs = ({ jobs, proposals, onApply }) => {
   const [search, setSearch] = useState('');
   const [skillFilter, setSkillFilter] = useState('All');
   const [sort, setSort] = useState('newest');
-  const [savedOnly, setSavedOnly] = useState(false);
   const [detail, setDetail] = useState(null);
   const [applyingTo, setApplyingTo] = useState(null);
 
@@ -34,8 +33,7 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
         job.description.toLowerCase().includes(term) ||
         job.skills.join(' ').toLowerCase().includes(term);
       const matchesSkill = skillFilter === 'All' || job.skills.includes(skillFilter);
-      const matchesSaved = !savedOnly || savedJobIds.includes(job.id);
-      return matchesText && matchesSkill && matchesSaved;
+      return matchesText && matchesSkill;
     })
     .sort((a, b) => {
       if (sort === 'budget') return num(b.budget) - num(a.budget);
@@ -60,22 +58,12 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
               />
             </InputGroup>
           </Col>
-          <Col md={3}>
+          <Col md={7}>
             <Form.Select value={sort} onChange={(e) => setSort(e.target.value)}>
               <option value="newest">Newest first</option>
               <option value="budget">Highest budget</option>
               <option value="competition">Fewest proposals</option>
             </Form.Select>
-          </Col>
-          <Col md={4} className="d-flex justify-content-md-end">
-            <Button
-              variant={savedOnly ? 'primary' : 'outline-secondary'}
-              onClick={() => setSavedOnly(!savedOnly)}
-              size="sm"
-            >
-              <Icon name="bookmark" size={14} className="me-1" />
-              Saved ({savedJobIds.length})
-            </Button>
           </Col>
         </Row>
 
@@ -103,7 +91,7 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
               <Button
                 size="sm"
                 variant="outline-secondary"
-                onClick={() => { setSearch(''); setSkillFilter('All'); setSavedOnly(false); }}
+                onClick={() => { setSearch(''); setSkillFilter('All'); }}
               >
                 Clear filters
               </Button>
@@ -114,26 +102,15 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
         <Row className="g-3">
           {visible.map((job) => {
             const applied = appliedIds.includes(job.id);
-            const saved = savedJobIds.includes(job.id);
 
             return (
               <Col md={6} xl={4} key={job.id}>
                 <div className="wm-job">
-                  <div className="d-flex justify-content-between align-items-start gap-2">
-                    <div style={{ minWidth: 0 }}>
-                      <h6 className="wm-job__title">{job.title}</h6>
-                      <div className="wm-job__meta">
-                        {job.client} &middot; <Icon name="star" size={11} /> {job.client_rating}
-                      </div>
+                  <div style={{ minWidth: 0 }}>
+                    <h6 className="wm-job__title">{job.title}</h6>
+                    <div className="wm-job__meta">
+                      {job.client} &middot; <Icon name="star" size={11} /> {job.client_rating}
                     </div>
-                    <button
-                      type="button"
-                      className={`wm-save-btn ${saved ? 'active' : ''}`}
-                      onClick={() => onToggleSave(job.id)}
-                      aria-label={saved ? 'Remove from saved' : 'Save job'}
-                    >
-                      <Icon name="bookmark" size={17} />
-                    </button>
                   </div>
 
                   <div className="d-flex align-items-baseline gap-2 mt-2">
@@ -207,9 +184,7 @@ const AvailableJobs = ({ jobs, proposals, savedJobIds, onToggleSave, onApply }) 
               </div>
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="outline-secondary" onClick={() => onToggleSave(detail.id)}>
-                {savedJobIds.includes(detail.id) ? 'Remove from saved' : 'Save for later'}
-              </Button>
+              <Button variant="outline-secondary" onClick={() => setDetail(null)}>Close</Button>
               <Button
                 variant="primary"
                 disabled={appliedIds.includes(detail.id)}

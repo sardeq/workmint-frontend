@@ -2,30 +2,25 @@ import { useState } from 'react';
 import { Table, Button, Form, InputGroup, Modal, Alert, Row, Col } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, StatCard, EmptyState, Avatar } from '../../../components/Shared';
-import { money, shortDate, orderReleased } from '../../../data/helpers';
+import { money, shortDate, releasedOf, sumBy } from '../../../data/helpers';
 
 const STATUS_TONE = { active: 'success', pending: 'warn', suspended: 'danger' };
 const ROLES = ['All', 'client', 'freelancer', 'admin'];
 
-const UserManagement = ({ users, orders, onSetStatus }) => {
+const UserManagement = ({ users, contracts, onSetStatus, onDelete }) => {
   const [role, setRole] = useState('All');
   const [search, setSearch] = useState('');
   const [suspending, setSuspending] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
   const volumeFor = (person) => {
-    if (person.role === 'client') {
-      return orders
-        .filter((order) => order.client_id === person.id)
-        .reduce((sum, order) => sum + orderReleased(order), 0);
-    }
-    if (person.role === 'freelancer') {
-      return orders
-        .filter((order) => order.freelancer_id === person.id)
-        .reduce((sum, order) => sum + orderReleased(order), 0);
-    }
-    return 0;
+    const theirs = contracts.filter((contract) =>
+      person.role === 'client'
+        ? contract.client_id === person.id
+        : contract.freelancer_id === person.id);
+    return sumBy(theirs, releasedOf);
   };
 
   const visible = users
@@ -146,18 +141,31 @@ const UserManagement = ({ users, orders, onSetStatus }) => {
                   <td className="text-end">
                     {person.role === 'admin' ? (
                       <span className="text-muted" style={{ fontSize: '0.82rem' }}>Protected</span>
-                    ) : person.status === 'active' ? (
-                      <Button
-                        size="sm"
-                        variant="outline-secondary"
-                        onClick={() => { setSuspending(person); setReason(''); setError(''); }}
-                      >
-                        Suspend
-                      </Button>
                     ) : (
-                      <Button size="sm" variant="primary" onClick={() => onSetStatus(person.id, 'active')}>
-                        {person.status === 'pending' ? 'Approve' : 'Reinstate'}
-                      </Button>
+                      <>
+                        {person.status === 'active' ? (
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            className="me-2"
+                            onClick={() => { setSuspending(person); setReason(''); setError(''); }}
+                          >
+                            Suspend
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            className="me-2"
+                            onClick={() => onSetStatus(person.id, 'active')}
+                          >
+                            {person.status === 'pending' ? 'Approve' : 'Reinstate'}
+                          </Button>
+                        )}
+                        <Button size="sm" variant="link" className="p-0 text-danger" onClick={() => setDeleting(person)}>
+                          <Icon name="trash" size={14} />
+                        </Button>
+                      </>
                     )}
                   </td>
                 </tr>
@@ -177,8 +185,7 @@ const UserManagement = ({ users, orders, onSetStatus }) => {
               <Modal.Body>
                 {error && <Alert variant="danger" className="py-2" style={{ fontSize: '0.85rem' }}>{error}</Alert>}
                 <p className="text-muted" style={{ fontSize: '0.87rem' }}>
-                  They are signed out immediately and cannot sign back in. Money already in escrow is
-                  unaffected and still needs a mediator if it is contested.
+                  They cannot sign back in. Money already in escrow is unaffected.
                 </p>
                 <Form.Group>
                   <Form.Label>Reason</Form.Label>
@@ -197,6 +204,22 @@ const UserManagement = ({ users, orders, onSetStatus }) => {
               </Modal.Footer>
             </Form>
           </>
+        )}
+      </Modal>
+      <Modal show={Boolean(deleting)} onHide={() => setDeleting(null)} centered size="sm">
+        {deleting && (
+          <Modal.Body className="text-center p-4">
+            <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>Delete {deleting.name}?</h6>
+            <p className="text-muted" style={{ fontSize: '0.86rem' }}>
+              The account row and everything that references it are removed. This cannot be undone.
+            </p>
+            <div className="d-flex gap-2 justify-content-center">
+              <Button size="sm" variant="outline-secondary" onClick={() => setDeleting(null)}>Keep it</Button>
+              <Button size="sm" variant="danger" onClick={() => { onDelete(deleting.id); setDeleting(null); }}>
+                Delete account
+              </Button>
+            </div>
+          </Modal.Body>
         )}
       </Modal>
     </>

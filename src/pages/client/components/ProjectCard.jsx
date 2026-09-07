@@ -1,58 +1,46 @@
 import { Button } from 'react-bootstrap';
-import Icon from '../../../components/Icon';
-import { Pill, Avatar, EscrowBar } from '../../../components/Shared';
+import { Pill, Avatar } from '../../../components/Shared';
 import {
-  money, shortDate, deadlineLabel, deadlineTone, milestonesOf,
-  orderStatus, orderTotal, orderReleased, orderEscrow, orderProgress, unreadCount, clientNextAction,
+  money, shortDate, deadlineLabel, deadlineTone, isLive, contractStatus, clientAction,
 } from '../../../data/helpers';
 
-const ProjectCard = ({ project, onOpen }) => {
-  const status = orderStatus(project, 'client');
-  const action = clientNextAction(project);
-  const unread = unreadCount(project, 'client');
-  const done = status.key === 'completed';
+const ProjectCard = ({ contract, onOpen }) => {
+  const status = contractStatus(contract, 'client');
+  const action = clientAction(contract);
 
   return (
     <div className="wm-panel h-100 d-flex flex-column">
       <div className="d-flex justify-content-between align-items-start gap-2 mb-3">
         <div style={{ minWidth: 0 }}>
-          <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)', marginBottom: '0.35rem' }}>{project.project}</h6>
+          <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)', marginBottom: '0.35rem' }}>
+            {contract.title}
+          </h6>
           <div className="d-flex align-items-center gap-2">
-            <Avatar name={project.freelancer_name} size={26} />
-            <span className="text-muted" style={{ fontSize: '0.82rem' }}>{project.freelancer_name}</span>
+            <Avatar name={contract.freelancer_name} size={26} />
+            <span className="text-muted" style={{ fontSize: '0.82rem' }}>{contract.freelancer_name}</span>
           </div>
         </div>
         <Pill tone={status.tone}>{status.label}</Pill>
       </div>
 
-      <div className="d-flex justify-content-between align-items-baseline mb-1">
-        <span className="wm-num" style={{ fontSize: '1.15rem' }}>{money(orderReleased(project))}</span>
+      <div className="d-flex justify-content-between align-items-baseline mb-3">
+        <span className="wm-num" style={{ fontSize: '1.15rem' }}>{money(contract.amount)}</span>
         <span className="text-muted" style={{ fontSize: '0.8rem' }}>
-          released of {money(orderTotal(project))}
+          {contract.status === 'approved' ? 'released' : 'in escrow'}
         </span>
-      </div>
-      <EscrowBar released={orderReleased(project)} total={orderTotal(project)} />
-
-      <div className="d-flex justify-content-between mt-2 mb-3" style={{ fontSize: '0.79rem' }}>
-        <span className="text-muted">
-          <span className="wm-num" style={{ fontSize: '0.82rem', color: 'var(--amber)' }}>
-            {money(orderEscrow(project))}
-          </span> in escrow
-        </span>
-        <span className="text-muted">{orderProgress(project)}% complete</span>
       </div>
 
       <div className="d-flex justify-content-between align-items-center pt-3 border-top" style={{ fontSize: '0.8rem' }}>
         <span className="text-muted">
-          {done ? `Delivered ${shortDate(project.deadline)}` : deadlineLabel(project.deadline)}
+          {isLive(contract) ? deadlineLabel(contract.deadline) : `Ended ${shortDate(contract.deadline)}`}
         </span>
-        {!done && <Pill tone={deadlineTone(project.deadline)}>{milestonesOf(project).length} milestones</Pill>}
+        {isLive(contract) && <Pill tone={deadlineTone(contract.deadline)}>Due {shortDate(contract.deadline)}</Pill>}
       </div>
 
       {action && (
         <div className="wm-note wm-note--danger mt-3 mb-0">
           <strong>Needs you</strong>
-          {action.label}
+          {action}
         </div>
       )}
 
@@ -61,10 +49,9 @@ const ProjectCard = ({ project, onOpen }) => {
           variant={action ? 'primary' : 'outline-secondary'}
           size="sm"
           className="w-100"
-          onClick={() => onOpen(project.id)}
+          onClick={() => onOpen(contract.id)}
         >
           Open project
-          {unread > 0 && <span className="ms-2"><Icon name="chat" size={12} /> {unread}</span>}
         </Button>
       </div>
     </div>

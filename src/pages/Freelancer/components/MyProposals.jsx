@@ -2,17 +2,9 @@ import { useState } from 'react';
 import { Row, Col, Button, Modal, Table } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, StatCard, EmptyState } from '../../../components/Shared';
-import { money, num, timeAgo } from '../../../data/helpers';
+import { money, num, timeAgo, PROPOSAL_TONE } from '../../../data/helpers';
 
-const STATUS_TONE = {
-  Pending: 'warn',
-  Interviewing: 'info',
-  Accepted: 'success',
-  Declined: 'danger',
-  Withdrawn: 'muted',
-};
-
-const FILTERS = ['All', 'Pending', 'Interviewing', 'Accepted', 'Declined', 'Withdrawn'];
+const FILTERS = ['All', 'Pending', 'Accepted', 'Declined', 'Withdrawn'];
 
 const MyProposals = ({ proposals, onWithdraw, onGo }) => {
   const [filter, setFilter] = useState('All');
@@ -23,7 +15,7 @@ const MyProposals = ({ proposals, onWithdraw, onGo }) => {
   const winRate = decided.length === 0 ? null : Math.round((won / decided.length) * 100);
 
   const pipelineValue = proposals
-    .filter((p) => p.status === 'Pending' || p.status === 'Interviewing')
+    .filter((p) => p.status === 'Pending')
     .reduce((sum, p) => sum + num(p.amount), 0);
 
   const visible = proposals
@@ -111,12 +103,12 @@ const MyProposals = ({ proposals, onWithdraw, onGo }) => {
                   <td className="text-muted">{proposal.client}</td>
                   <td className="wm-num">{money(proposal.amount)}</td>
                   <td className="text-muted" style={{ fontSize: '0.85rem' }}>{timeAgo(proposal.sent_at)}</td>
-                  <td><Pill tone={STATUS_TONE[proposal.status]}>{proposal.status}</Pill></td>
+                  <td><Pill tone={PROPOSAL_TONE[proposal.status]}>{proposal.status}</Pill></td>
                   <td className="text-end">
                     <Button size="sm" variant="link" className="p-0 me-3" onClick={() => setReading(proposal)}>
                       View
                     </Button>
-                    {(proposal.status === 'Pending' || proposal.status === 'Interviewing') && (
+                    {proposal.status === 'Pending' && (
                       <Button size="sm" variant="outline-secondary" onClick={() => onWithdraw(proposal.id)}>
                         Withdraw
                       </Button>
@@ -152,7 +144,7 @@ const MyProposals = ({ proposals, onWithdraw, onGo }) => {
                 </Col>
                 <Col xs={4}>
                   <div className="wm-eyebrow">Status</div>
-                  <Pill tone={STATUS_TONE[reading.status]}>{reading.status}</Pill>
+                  <Pill tone={PROPOSAL_TONE[reading.status]}>{reading.status}</Pill>
                 </Col>
               </Row>
 
@@ -161,7 +153,7 @@ const MyProposals = ({ proposals, onWithdraw, onGo }) => {
             </Modal.Body>
             <Modal.Footer>
               <Button variant="outline-secondary" onClick={() => setReading(null)}>Close</Button>
-              {(reading.status === 'Pending' || reading.status === 'Interviewing') && (
+              {reading.status === 'Pending' && (
                 <Button variant="primary" onClick={() => { onWithdraw(reading.id); setReading(null); }}>
                   <Icon name="trash" size={13} className="me-1" /> Withdraw proposal
                 </Button>

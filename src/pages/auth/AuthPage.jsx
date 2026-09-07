@@ -17,8 +17,8 @@ const DEMO_ACCOUNTS = [
 ];
 
 const ROLES = [
-  { key: 'client', icon: 'briefcase', title: 'I want to hire', body: 'Post work, compare proposals, pay in milestones.' },
-  { key: 'freelancer', icon: 'user', title: 'I want to work', body: 'Bid on jobs, deliver milestones, get paid on approval.' },
+  { key: 'client', icon: 'briefcase', title: 'I want to hire', body: 'Post work, compare proposals, pay only for approved work.' },
+  { key: 'freelancer', icon: 'user', title: 'I want to work', body: 'Bid on jobs, deliver the work, get paid on approval.' },
 ];
 
 const BLANK = { name: '', email: '', company: '', title: '', password: '', confirm: '', accepted: false };
@@ -165,12 +165,12 @@ const AuthPage = ({ mode, user, onLogin }) => {
           <h2>{isLogin ? 'Pick up where you left off.' : 'Money in escrow before the work starts.'}</h2>
           <p>
             {isLogin
-              ? 'Your projects, milestones and escrow balance are exactly where you left them.'
+              ? 'Your projects and escrow balance are exactly where you left them.'
               : 'Clients fund the whole contract up front. Freelancers see it sitting there before writing a line of code. Nobody chases an invoice.'}
           </p>
 
           <ul className="value-list">
-            <li><Icon name="check" size={16} strokeWidth={2.5} /><span>Milestone by milestone, approved before it is paid</span></li>
+            <li><Icon name="check" size={16} strokeWidth={2.5} /><span>Approved by the client before a cent is paid out</span></li>
             <li><Icon name="check" size={16} strokeWidth={2.5} /><span>Revision allowances, so scope creep has a price</span></li>
             <li><Icon name="check" size={16} strokeWidth={2.5} /><span>A mediator on every contract if something goes wrong</span></li>
           </ul>

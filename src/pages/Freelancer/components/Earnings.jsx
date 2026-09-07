@@ -3,29 +3,26 @@ import { Row, Col, Button, Table, Modal, Form, Alert } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { StatCard, Pill, EmptyState } from '../../../components/Shared';
 import {
-  money, num, netOf, shortDate, timeAgo, orderRef,
-  orderStatus, orderEscrow, milestonesOf, FEE_RATE,
+  money, num, netOf, shortDate, timeAgo, contractRef,
+  isLive, escrowOf, releasedOf, sumBy, FEE_RATE,
 } from '../../../data/helpers';
 
-const Earnings = ({ orders, withdrawals, onWithdraw }) => {
+const Earnings = ({ contracts, withdrawals, onWithdraw }) => {
   const [show, setShow] = useState(false);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('Bank transfer');
   const [error, setError] = useState('');
 
-  const credits = orders.flatMap((order) =>
-    milestonesOf(order)
-      .filter((milestone) => milestone.status === 'approved')
-      .map((milestone) => ({
-        id: `C-${order.id}-${milestone.id}`,
-        at: milestone.approved_on || order.deadline,
-        label: milestone.title,
-        sub: `${order.client} - ${orderRef(order)}`,
-        gross: num(milestone.amount),
-        net: netOf(milestone.amount),
-        kind: 'credit',
-      }))
-  );
+  const credits = contracts
+    .filter((contract) => contract.status === 'approved')
+    .map((contract) => ({
+      id: `C-${contract.id}`,
+      at: contract.approved_at,
+      label: contract.title,
+      sub: `${contract.client} - ${contractRef(contract)}`,
+      gross: num(contract.amount),
+      net: netOf(contract.amount),
+    }));
 
   const debits = withdrawals.map((withdrawal) => ({
     id: `D-${withdrawal.id}`,
@@ -34,38 +31,15 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
     sub: withdrawal.status,
     gross: null,
     net: -num(withdrawal.amount),
-    kind: 'debit',
   }));
 
   const ledger = [...credits, ...debits].sort((a, b) => new Date(b.at) - new Date(a.at));
 
-  const lifetimeNet = credits.reduce((sum, row) => sum + row.net, 0);
-  const paidOut = withdrawals.reduce((sum, row) => sum + num(row.amount), 0);
+  const lifetimeNet = netOf(sumBy(contracts, releasedOf));
+  const paidOut = sumBy(withdrawals, (row) => num(row.amount));
   const available = lifetimeNet - paidOut;
-  const feesPaid = credits.reduce((sum, row) => sum + (row.gross - row.net), 0);
-
-  const inEscrow = orders
-    .filter((order) => orderStatus(order).key !== 'completed')
-    .reduce((sum, order) => sum + orderEscrow(order), 0);
-
-  const months = [];
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i, 1);
-    months.push({
-      key: `${date.getFullYear()}-${date.getMonth()}`,
-      label: date.toLocaleDateString('en-US', { month: 'short' }),
-      total: 0,
-    });
-  }
-
-  credits.forEach((credit) => {
-    const date = new Date(credit.at);
-    const bucket = months.find((month) => month.key === `${date.getFullYear()}-${date.getMonth()}`);
-    if (bucket) bucket.total += credit.net;
-  });
-
-  const peak = Math.max(...months.map((month) => month.total), 1);
+  const feesPaid = sumBy(contracts, releasedOf) - lifetimeNet;
+  const inEscrow = sumBy(contracts.filter(isLive), escrowOf);
 
   const handleWithdraw = (e) => {
     e.preventDefault();
@@ -105,27 +79,15 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
 
       <Row className="g-3">
         <Col lg={4}>
-          <div className="wm-panel mb-3">
+          <div className="wm-panel">
             <div className="wm-eyebrow">Ready to withdraw</div>
             <div className="wm-num" style={{ fontSize: '2rem' }}>{money(available)}</div>
             <p className="text-muted mt-2" style={{ fontSize: '0.83rem' }}>
-              Funds clear as soon as a client approves a milestone. Workmint keeps {FEE_RATE * 100}%.
+              Funds clear as soon as a client approves your work. Workmint keeps {FEE_RATE * 100}%.
             </p>
             <Button variant="primary" className="w-100" disabled={available <= 0} onClick={() => setShow(true)}>
               Withdraw funds
             </Button>
-          </div>
-
-          <div className="wm-panel">
-            <div className="wm-eyebrow mb-3">Released per month</div>
-            <div className="wm-bars">
-              {months.map((month) => (
-                <div className="wm-bars__col" key={month.key} title={money(month.total)}>
-                  <div className="wm-bars__bar" style={{ height: `${Math.max((month.total / peak) * 100, 3)}%` }} />
-                  <span className="wm-bars__label">{month.label}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </Col>
 
@@ -133,11 +95,11 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
           <div className="wm-panel wm-panel--flush">
             <div className="wm-panel__head">
               <h5 className="m-0" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>Transactions</h5>
-              <p className="m-0 text-muted" style={{ fontSize: '0.82rem' }}>Every milestone release and payout</p>
+              <p className="m-0 text-muted" style={{ fontSize: '0.82rem' }}>Every release and every payout</p>
             </div>
 
             {ledger.length === 0 ? (
-              <EmptyState icon="wallet" title="Nothing here yet" body="Your first approved milestone shows up as a credit." />
+              <EmptyState icon="wallet" title="Nothing here yet" body="Your first approved contract shows up as a credit." />
             ) : (
               <Table hover responsive className="align-middle">
                 <thead>
@@ -154,8 +116,8 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
                     <tr key={row.id}>
                       <td>
                         <div className="d-flex align-items-center gap-2">
-                          <span className={`wm-stat__icon wm-stat__icon--${row.kind === 'credit' ? 'success' : 'muted'}`}>
-                            <Icon name={row.kind === 'credit' ? 'check' : 'upload'} size={13} />
+                          <span className={`wm-stat__icon wm-stat__icon--${row.net > 0 ? 'success' : 'muted'}`}>
+                            <Icon name={row.net > 0 ? 'check' : 'upload'} size={13} />
                           </span>
                           <div>
                             <div style={{ fontWeight: 600, color: 'var(--slate-dark)', fontSize: '0.9rem' }}>{row.label}</div>
@@ -167,9 +129,7 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
                         {shortDate(row.at)}
                         <div style={{ fontSize: '0.73rem' }}>{timeAgo(row.at)}</div>
                       </td>
-                      <td className="text-end wm-num" style={{ fontWeight: 500 }}>
-                        {row.gross === null ? '-' : money(row.gross)}
-                      </td>
+                      <td className="text-end wm-num">{row.gross === null ? '-' : money(row.gross)}</td>
                       <td className="text-end text-muted" style={{ fontSize: '0.85rem' }}>
                         {row.gross === null ? '-' : `-${money(row.gross - row.net)}`}
                       </td>
@@ -202,7 +162,7 @@ const Earnings = ({ orders, withdrawals, onWithdraw }) => {
                 max={available}
                 placeholder="0"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => { setAmount(e.target.value); setError(''); }}
               />
               <Button variant="link" size="sm" className="p-0 mt-1" onClick={() => setAmount(String(available))}>
                 Withdraw everything

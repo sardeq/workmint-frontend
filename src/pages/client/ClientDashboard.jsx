@@ -14,62 +14,58 @@ import FindFreelancers from './components/FindFreelancers';
 import Payments from './components/Payments';
 
 import {
-  ordersApi, jobsApi, proposalsApi, milestonesApi, messagesApi,
-  disputesApi, usersApi, paymentMethodsApi, errorText,
+  contractsApi, jobsApi, proposalsApi, messagesApi, usersApi,
+  paymentsApi, paymentMethodsApi, errorText,
 } from '../../api/api';
-import { unreadCount, clientNeedsAttention, orderRef, money } from '../../data/helpers';
+import { clientAction, money } from '../../data/helpers';
 
 const PAGE_COPY = {
-  'Overview': ['Your workspace', 'What needs a decision from you, in order of urgency'],
+  'Overview': ['Your workspace', 'What needs a decision from you'],
   'My Projects': ['My projects', 'Live contracts and where the money sits'],
   'Proposals': ['Proposals', 'Freelancers who applied to your jobs'],
-  'Post a Job': ['Post a job', 'Describe the work and set the milestones'],
-  'Find Freelancers': ['Find freelancers', 'Search the directory and invite someone directly'],
-  'Messages': ['Messages', 'One thread per project'],
-  'Payments': ['Payments', 'Funded, released, and still in escrow'],
+  'Post a Job': ['Post a job', 'Describe the work and set a budget'],
+  'Find Freelancers': ['Find freelancers', 'Search the directory and invite someone'],
+  'Messages': ['Messages', 'One thread per contract'],
+  'Payments': ['Payments', 'Pay in your own currency and keep the receipts'],
 };
 
 const ClientDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('Overview');
-  const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
-  const [orders, setOrders] = useState([]);
+  const [contracts, setContracts] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [talent, setTalent] = useState([]);
-  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [methods, setMethods] = useState([]);
 
   const notify = (text, tone = 'success') => setToast({ text, tone });
 
-  const loadOrders = async () => {
-    const rows = await ordersApi.getAll({ client_id: user.id });
+  const loadContracts = async () => {
+    const rows = await contractsApi.getAll({ client_id: user.id });
     const full = [];
     for (const row of rows) {
-      full.push(await ordersApi.getOne(row.id));
+      full.push(await contractsApi.getOne(row.id));
     }
-    setOrders(full);
+    setContracts(full);
   };
 
-  const loadJobs = async () => {
-    const rows = await jobsApi.getAll({ client_id: user.id });
-    setJobs(rows);
-  };
+  const loadJobs = async () => setJobs(await jobsApi.getAll({ client_id: user.id }));
 
-  const loadProposals = async () => {
-    const rows = await proposalsApi.getAll({ client_id: user.id });
-    setProposals(rows);
-  };
+  const loadProposals = async () => setProposals(await proposalsApi.getAll({ client_id: user.id }));
 
   useEffect(() => {
     const loadWorkspace = async () => {
       try {
-        await loadOrders();
+        await loadContracts();
         await loadJobs();
         await loadProposals();
-        setTalent(await usersApi.getAll({ role: 'freelancer', status: 'active' }));
-        setPaymentMethods(await paymentMethodsApi.getAll(user.id));
+        setTalent(await usersApi.getAll({ role: 'freelancer' }));
+        setPayments(await paymentsApi.getAll(user.id));
+        setMethods(await paymentMethodsApi.getAll(user.id));
       } catch (err) {
         notify(errorText(err, 'Could not load your workspace.'), 'warn');
       }
@@ -79,104 +75,65 @@ const ClientDashboard = ({ user, onLogout }) => {
     loadWorkspace();
   }, []);
 
-  const refreshOrder = async (orderId) => {
-    const fresh = await ordersApi.getOne(orderId);
-    setOrders(orders.map((order) => (order.id === orderId ? fresh : order)));
-    return fresh;
+  // Replaces one contract in state with a fresh copy from the API.
+  const refreshContract = async (id) => {
+    const fresh = await contractsApi.getOne(id);
+    setContracts(contracts.map((contract) => (contract.id === id ? fresh : contract)));
   };
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    setSelectedOrderId(null);
+    setSelectedId(null);
   };
 
-  const openProject = (orderId) => {
+  const openProject = (id) => {
     setActiveTab('My Projects');
-    setSelectedOrderId(orderId);
+    setSelectedId(id);
   };
 
-  const selectedOrder = orders.find((order) => order.id === selectedOrderId) || null;
+  const selected = contracts.find((contract) => contract.id === selectedId) || null;
 
   const badges = {
-    'My Projects': orders.filter(clientNeedsAttention).length,
+    'My Projects': contracts.filter(clientAction).length,
     'Proposals': proposals.filter((p) => p.status === 'Pending').length,
-    'Messages': orders.reduce((sum, order) => sum + unreadCount(order, 'client'), 0),
   };
 
-  const notifications = orders
-    .flatMap((order) =>
-      (order.activity || [])
-        .filter((item) => item.actor === 'freelancer' || item.actor === 'system')
-        .map((item) => ({ id: `N-${order.id}-${item.id}`, at: item.at, text: item.text }))
-    )
-    .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 12);
-
-  const approveMilestone = async (orderId, milestoneId) => {
+  const approve = async (id) => {
     try {
-      const milestone = await milestonesApi.approve(milestoneId);
-      await refreshOrder(orderId);
-      notify(`Approved "${milestone.title}" - ${money(milestone.amount)} released`);
+      const contract = await contractsApi.approve(id);
+      await refreshContract(id);
+      notify(`Approved. ${money(contract.amount)} released to the freelancer.`);
     } catch (err) {
-      notify(errorText(err, 'Could not approve that milestone.'), 'warn');
+      notify(errorText(err, 'Could not approve that delivery.'), 'warn');
     }
   };
 
-  const requestRevision = async (orderId, milestoneId, note) => {
+  const requestRevision = async (id, note) => {
     try {
-      await milestonesApi.requestRevision(milestoneId, note);
-      await refreshOrder(orderId);
+      await contractsApi.requestRevision(id, note);
+      await refreshContract(id);
       notify('Sent back with your notes', 'warn');
     } catch (err) {
       notify(errorText(err, 'Could not send that back.'), 'warn');
     }
   };
 
-  const decideScopeChange = async (orderId, requestId, decision) => {
+  const cancelContract = async (id) => {
     try {
-      const request = await ordersApi.decideScopeChange(orderId, requestId, decision);
-      await refreshOrder(orderId);
-      if (decision === 'Approved') {
-        notify(`Scope change approved, ${money(request.extra_cost)} added to escrow`);
-      } else {
-        notify('Scope change declined', 'warn');
-      }
+      await contractsApi.cancel(id);
+      await refreshContract(id);
+      notify('Contract cancelled', 'warn');
     } catch (err) {
-      notify(errorText(err), 'warn');
+      notify(errorText(err, 'Could not cancel that contract.'), 'warn');
     }
   };
 
-  const sendMessage = async (orderId, senderRole, text) => {
+  const sendMessage = async (contractId, senderRole, text) => {
     try {
-      await messagesApi.send(orderId, senderRole, text);
-      await refreshOrder(orderId);
+      await messagesApi.send(contractId, senderRole, text);
+      await refreshContract(contractId);
     } catch (err) {
       notify(errorText(err, 'Message not sent.'), 'warn');
-    }
-  };
-
-  const markThreadRead = async (orderId, role) => {
-    try {
-      await messagesApi.markRead(orderId, role);
-      await refreshOrder(orderId);
-    } catch (err) {
-      notify(errorText(err), 'warn');
-    }
-  };
-
-  const raiseDispute = async (orderId, milestoneId, raisedBy, form) => {
-    try {
-      await disputesApi.create({
-        order_id: orderId,
-        milestone_id: milestoneId,
-        raised_by: raisedBy,
-        reason: form.reason,
-        detail: form.detail,
-      });
-      await refreshOrder(orderId);
-      notify('Dispute opened. A mediator will review it.', 'warn');
-    } catch (err) {
-      notify(errorText(err, 'Could not open that dispute.'), 'warn');
     }
   };
 
@@ -204,7 +161,7 @@ const ClientDashboard = ({ user, onLogout }) => {
       await jobsApi.close(jobId);
       await loadJobs();
       await loadProposals();
-      notify('Job closed and open proposals declined', 'warn');
+      notify('Job closed and its open proposals declined', 'warn');
     } catch (err) {
       notify(errorText(err), 'warn');
     }
@@ -213,12 +170,12 @@ const ClientDashboard = ({ user, onLogout }) => {
   const hire = async (proposalId) => {
     try {
       const proposal = proposals.find((p) => p.id === proposalId);
-      const order = await proposalsApi.accept(proposalId);
+      const contract = await proposalsApi.accept(proposalId);
       await loadProposals();
       await loadJobs();
-      await loadOrders();
+      await loadContracts();
       notify(`Hired ${proposal.freelancer_name}. ${money(proposal.amount)} is now in escrow.`);
-      openProject(order.id);
+      openProject(contract.id);
     } catch (err) {
       notify(errorText(err, 'Could not accept that proposal.'), 'warn');
     }
@@ -234,32 +191,34 @@ const ClientDashboard = ({ user, onLogout }) => {
     }
   };
 
-  const addPaymentMethod = async (label, kind) => {
+  const pay = async (body) => {
+    try {
+      await paymentsApi.create({ ...body, client_id: user.id });
+      setPayments(await paymentsApi.getAll(user.id));
+      notify('Payment recorded');
+    } catch (err) {
+      notify(errorText(err, 'Could not take that payment.'), 'warn');
+    }
+  };
+
+  const addMethod = async (label, kind) => {
     try {
       const row = await paymentMethodsApi.create({ client_id: user.id, label, kind });
-      setPaymentMethods([...paymentMethods, row]);
+      setMethods([...methods, row]);
       notify('Payment method added');
     } catch (err) {
       notify(errorText(err, 'Could not add that payment method.'), 'warn');
     }
   };
 
-  const setPrimaryMethod = async (id) => {
+  const removeMethod = async (id) => {
     try {
-      await paymentMethodsApi.setPrimary(id);
-      setPaymentMethods(paymentMethods.map((method) => ({ ...method, is_primary: method.id === id })));
-      notify('Primary payment method updated');
+      await paymentMethodsApi.remove(id);
+      setMethods(methods.filter((method) => method.id !== id));
+      notify('Payment method removed', 'warn');
     } catch (err) {
-      notify(errorText(err, 'Could not update your payment methods.'), 'warn');
+      notify(errorText(err), 'warn');
     }
-  };
-
-  const clientProfile = {
-    company: user.company,
-    contact: user.name,
-    role: user.title,
-    location: user.location,
-    since: user.joined_at,
   };
 
   const renderContent = () => {
@@ -275,10 +234,10 @@ const ClientDashboard = ({ user, onLogout }) => {
     if (activeTab === 'Overview') {
       return (
         <ClientOverview
-          orders={orders}
+          contracts={contracts}
           jobs={jobs}
           proposals={proposals}
-          profile={clientProfile}
+          user={user}
           onOpenProject={openProject}
           onGo={handleTabChange}
         />
@@ -286,21 +245,19 @@ const ClientDashboard = ({ user, onLogout }) => {
     }
 
     if (activeTab === 'My Projects') {
-      if (selectedOrder) {
+      if (selected) {
         return (
           <ProjectDetails
-            order={selectedOrder}
-            onBack={() => setSelectedOrderId(null)}
-            onApprove={approveMilestone}
+            contract={selected}
+            onBack={() => setSelectedId(null)}
+            onApprove={approve}
             onRequestRevision={requestRevision}
-            onDecideScope={decideScopeChange}
+            onCancel={cancelContract}
             onSend={sendMessage}
-            onRead={markThreadRead}
-            onRaiseDispute={raiseDispute}
           />
         );
       }
-      return <ClientProjects orders={orders} onOpen={openProject} onGo={handleTabChange} />;
+      return <ClientProjects contracts={contracts} onOpen={openProject} onGo={handleTabChange} />;
     }
 
     if (activeTab === 'Proposals') {
@@ -332,24 +289,17 @@ const ClientDashboard = ({ user, onLogout }) => {
     }
 
     if (activeTab === 'Messages') {
-      return (
-        <Conversations
-          orders={orders}
-          role="client"
-          onSend={sendMessage}
-          onRead={markThreadRead}
-          onOpenOrder={openProject}
-        />
-      );
+      return <Conversations contracts={contracts} role="client" onSend={sendMessage} />;
     }
 
     if (activeTab === 'Payments') {
       return (
         <Payments
-          orders={orders}
-          methods={paymentMethods}
-          onAddMethod={addPaymentMethod}
-          onSetPrimary={setPrimaryMethod}
+          payments={payments}
+          methods={methods}
+          onPay={pay}
+          onAddMethod={addMethod}
+          onRemoveMethod={removeMethod}
         />
       );
     }
@@ -357,15 +307,15 @@ const ClientDashboard = ({ user, onLogout }) => {
     return null;
   };
 
-  const [pageTitle, pageSub] = PAGE_COPY[activeTab] || PAGE_COPY.Overview;
+  const [pageTitle, pageSub] = PAGE_COPY[activeTab];
   const firstName = user.name.split(' ')[0];
 
   let title = pageTitle;
   let subtitle = pageSub;
 
-  if (selectedOrder) {
-    title = selectedOrder.project;
-    subtitle = `${orderRef(selectedOrder)} with ${selectedOrder.freelancer_name}`;
+  if (selected) {
+    title = selected.title;
+    subtitle = `With ${selected.freelancer_name}`;
   } else if (activeTab === 'Overview') {
     title = `Welcome back, ${firstName}`;
   }
@@ -379,7 +329,6 @@ const ClientDashboard = ({ user, onLogout }) => {
       activeTab={activeTab}
       setActiveTab={handleTabChange}
       badges={badges}
-      notifications={notifications}
     >
       {renderContent()}
       <ToastMessage toast={toast} onClose={() => setToast(null)} />

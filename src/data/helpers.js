@@ -1,6 +1,11 @@
-export const FEE_RATE = 0.1;
-export const CLIENT_FEE_RATE = 0.03;
+// Small pure functions shared by the dashboards. Nothing here talks to the API
+// or to React - each one takes a value and returns a value.
 
+// The two fees Workmint charges.
+export const FEE_RATE = 0.1;         // taken out of what the freelancer receives
+export const CLIENT_FEE_RATE = 0.03; // added on top of what the client pays
+
+// PostgreSQL returns NUMERIC columns as strings, so wrap anything money-shaped.
 export const num = (value) => Number(value || 0);
 
 export const money = (value) =>
@@ -13,15 +18,18 @@ export const grossWithClientFee = (amount) => Math.round(num(amount) * (1 + CLIE
 export const initials = (name = '') =>
   name.trim().split(' ').slice(0, 2).map((word) => word[0]).join('').toUpperCase();
 
-export const orderRef = (order) => `ORD-${order.id}`;
+export const contractRef = (contract) => `CON-${contract.id}`;
 
 export const shortDate = (value) =>
   new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-export const dayOffset = (days) => {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+export const timeAgo = (value) => {
+  const minutes = Math.round((Date.now() - new Date(value).getTime()) / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)}h ago`;
+  if (minutes < 43200) return `${Math.round(minutes / 1440)}d ago`;
+  return shortDate(value);
 };
 
 export const daysLeft = (value) => {
@@ -47,148 +55,49 @@ export const deadlineTone = (value) => {
   return 'muted';
 };
 
-export const timeAgo = (value) => {
-  const mins = Math.round((Date.now() - new Date(value).getTime()) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
-  if (mins < 43200) return `${Math.round(mins / 1440)}d ago`;
-  return shortDate(value);
+// A contract has one status. The same status reads differently depending on
+// which side of the deal you are on, so each entry holds both wordings.
+export const CONTRACT_STATUS = {
+  in_progress: { client: 'In progress', freelancer: 'In progress', tone: 'info' },
+  delivered: { client: 'Needs your review', freelancer: 'Awaiting client', tone: 'warn' },
+  revision: { client: 'Revision requested', freelancer: 'Revision needed', tone: 'danger' },
+  approved: { client: 'Completed', freelancer: 'Completed', tone: 'success' },
+  cancelled: { client: 'Cancelled', freelancer: 'Cancelled', tone: 'muted' },
 };
 
-export const hoursSince = (value) =>
-  Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 3600000));
-
-export const MILESTONE_STATUS = {
-  pending: { label: 'Not started', tone: 'muted' },
-  active: { label: 'In progress', tone: 'info' },
-  submitted: { label: 'Awaiting review', tone: 'warn' },
-  revision: { label: 'Revision needed', tone: 'danger' },
-  approved: { label: 'Approved', tone: 'success' },
-  disputed: { label: 'In dispute', tone: 'danger' },
-  refunded: { label: 'Refunded', tone: 'muted' },
+export const contractStatus = (contract, role = 'freelancer') => {
+  const entry = CONTRACT_STATUS[contract.status];
+  return { key: contract.status, label: entry[role], tone: entry.tone };
 };
 
-export const ORDER_STATUS = {
-  progress: { freelancer: 'In progress', client: 'In progress', tone: 'info' },
-  awaiting: { freelancer: 'Awaiting client', client: 'Needs your review', tone: 'warn' },
-  revision: { freelancer: 'Revision needed', client: 'Revision requested', tone: 'danger' },
-  disputed: { freelancer: 'In dispute', client: 'In dispute', tone: 'danger' },
-  completed: { freelancer: 'Completed', client: 'Completed', tone: 'success' },
-  cancelled: { freelancer: 'Cancelled', client: 'Cancelled', tone: 'muted' },
+export const PROPOSAL_TONE = {
+  Pending: 'warn',
+  Accepted: 'success',
+  Declined: 'danger',
+  Withdrawn: 'muted',
 };
 
-export const DISPUTE_STATUS = {
-  'Open': { tone: 'danger' },
-  'Under review': { tone: 'warn' },
-  'Resolved': { tone: 'success' },
-};
+// Still running: not finished and not called off.
+export const isLive = (contract) =>
+  contract.status !== 'approved' && contract.status !== 'cancelled';
 
-export const DISPUTE_OUTCOMES = [
-  { key: 'release', label: 'Release to freelancer', body: 'The work stands. The full milestone is paid out.' },
-  { key: 'refund', label: 'Refund the client', body: 'The milestone is cancelled and the money leaves escrow back to the client.' },
-  { key: 'split', label: 'Split it evenly', body: 'Half is released to the freelancer, half is refunded. Used when both sides are partly right.' },
-];
+// Money the client has funded but not yet paid out.
+export const escrowOf = (contract) => (isLive(contract) ? num(contract.amount) : 0);
 
-export const milestonesOf = (order) => order.milestones || [];
+// Money that has actually changed hands.
+export const releasedOf = (contract) => (contract.status === 'approved' ? num(contract.amount) : 0);
 
-export const changeRequestsOf = (order) => order.change_requests || [];
+// Adds up one field across a list: sumBy(contracts, escrowOf)
+export const sumBy = (list, pick) => list.reduce((total, item) => total + pick(item), 0);
 
-export const messagesOf = (order) => order.messages || [];
-
-export const activityOf = (order) => order.activity || [];
-
-export const statusKey = (order) => {
-  const milestones = milestonesOf(order);
-  if (order.cancelled) return 'cancelled';
-  if (milestones.some((m) => m.status === 'disputed')) return 'disputed';
-  if (milestones.length > 0 && milestones.every((m) => m.status === 'approved' || m.status === 'refunded')) {
-    return 'completed';
-  }
-  if (milestones.some((m) => m.status === 'revision')) return 'revision';
-  if (milestones.some((m) => m.status === 'submitted')) return 'awaiting';
-  return 'progress';
-};
-
-export const orderStatus = (order, role = 'freelancer') => {
-  const key = statusKey(order);
-  const entry = ORDER_STATUS[key];
-  return { key, label: entry[role] || entry.freelancer, tone: entry.tone };
-};
-
-const sumBy = (milestones, status) =>
-  milestones.filter((m) => m.status === status).reduce((sum, m) => sum + num(m.amount), 0);
-
-export const orderTotal = (order) =>
-  milestonesOf(order).reduce((sum, m) => sum + num(m.amount), 0);
-
-export const orderReleased = (order) => sumBy(milestonesOf(order), 'approved');
-
-export const orderRefunded = (order) => sumBy(milestonesOf(order), 'refunded');
-
-export const orderEscrow = (order) =>
-  orderTotal(order) - orderReleased(order) - orderRefunded(order);
-
-export const orderProgress = (order) => {
-  const payable = orderTotal(order) - orderRefunded(order);
-  if (payable === 0) return 0;
-  return Math.round((orderReleased(order) / payable) * 100);
-};
-
-export const canDispute = (milestone) =>
-  milestone.status !== 'approved' &&
-  milestone.status !== 'refunded' &&
-  milestone.status !== 'disputed';
-
-export const unreadCount = (order, role = 'freelancer') =>
-  messagesOf(order).filter((m) => m.sender_role !== role && !m.read).length;
-
-export const nextAction = (order) => {
-  if (statusKey(order) === 'completed') return null;
-  const milestones = milestonesOf(order);
-
-  const revision = milestones.find((m) => m.status === 'revision');
-  if (revision) return { label: `Rework "${revision.title}"`, tone: 'danger', milestoneId: revision.id };
-
-  const active = milestones.find((m) => m.status === 'active');
-  if (active) return { label: `Deliver "${active.title}"`, tone: 'info', milestoneId: active.id };
-
-  const pending = milestones.find((m) => m.status === 'pending');
-  if (pending) return { label: `Start "${pending.title}"`, tone: 'muted', milestoneId: pending.id };
-
+// The one thing this side of the deal should do next, or null when it is their turn.
+export const freelancerAction = (contract) => {
+  if (contract.status === 'in_progress') return 'Deliver the work';
+  if (contract.status === 'revision') return 'Send a new version';
   return null;
 };
 
-export const needsAttention = (order) => {
-  if (statusKey(order) === 'completed') return false;
-  const milestones = milestonesOf(order);
-  const inFlight = milestones.some((m) => m.status === 'revision' || m.status === 'active');
-  const nothingStarted = milestones.every((m) => m.status === 'approved' || m.status === 'pending');
-  return inFlight || nothingStarted;
-};
-
-export const clientNextAction = (order) => {
-  if (statusKey(order) === 'completed') return null;
-
-  const submitted = milestonesOf(order).find((m) => m.status === 'submitted');
-  if (submitted) return { label: `Review "${submitted.title}"`, tone: 'warn', milestoneId: submitted.id };
-
-  const request = changeRequestsOf(order).find((cr) => cr.status === 'Pending');
-  if (request) return { label: 'Decide on a scope change', tone: 'info', changeRequestId: request.id };
-
+export const clientAction = (contract) => {
+  if (contract.status === 'delivered') return 'Review the delivery';
   return null;
-};
-
-export const clientNeedsAttention = (order) => Boolean(clientNextAction(order));
-
-export const byUrgency = (role = 'freelancer') => (a, b) => {
-  const rank = (order) => {
-    if (statusKey(order) === 'completed') return 2;
-    const waiting = role === 'client' ? clientNeedsAttention(order) : needsAttention(order);
-    return waiting ? 0 : 1;
-  };
-
-  const diff = rank(a) - rank(b);
-  if (diff !== 0) return diff;
-  return new Date(a.deadline) - new Date(b.deadline);
 };

@@ -191,7 +191,7 @@ const PostJobForm = ({ onPostJob }) => {
               <span className="wm-num">{money(grossWithClientFee(budget))}</span>
             </div>
             <Alert variant="light" className="mt-3 mb-0 border" style={{ fontSize: '0.82rem' }}>
-              Released milestone by milestone as you approve the work.
+              Released to the freelancer only once you approve the delivered work.
             </Alert>
           </div>
         </Col>

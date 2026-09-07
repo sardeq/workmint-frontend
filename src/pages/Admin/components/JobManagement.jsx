@@ -3,32 +3,32 @@ import { Table, Button, Form, InputGroup, Modal, Row, Col } from 'react-bootstra
 import Icon from '../../../components/Icon';
 import { Pill, StatCard, EmptyState } from '../../../components/Shared';
 import {
-  money, timeAgo, shortDate, deadlineLabel, deadlineTone, orderRef, milestonesOf,
-  orderStatus, orderTotal, orderEscrow, orderReleased,
+  money, num, timeAgo, shortDate, deadlineLabel, deadlineTone,
+  contractRef, contractStatus, isLive, sumBy,
 } from '../../../data/helpers';
 
 const VIEWS = [
   { key: 'jobs', label: 'Open listings' },
-  { key: 'contracts', label: 'Live contracts' },
+  { key: 'contracts', label: 'Contracts' },
 ];
 
-const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
+const JobManagement = ({ jobs, contracts, proposals, onDeleteJob }) => {
   const [view, setView] = useState('jobs');
   const [search, setSearch] = useState('');
   const [removing, setRemoving] = useState(null);
 
-  const active = orders.filter((order) => orderStatus(order).key !== 'completed');
-  const gmv = orders.reduce((sum, order) => sum + orderTotal(order), 0);
+  const live = contracts.filter(isLive);
+  const volume = sumBy(contracts, (contract) => num(contract.amount));
 
   const matches = (text) => String(text).toLowerCase().includes(search.toLowerCase());
 
   const visibleJobs = jobs.filter((job) => matches(job.title) || matches(job.client));
-  const visibleOrders = orders.filter(
-    (order) =>
-      matches(order.project) ||
-      matches(order.client) ||
-      matches(order.freelancer_name) ||
-      matches(orderRef(order))
+  const visibleContracts = contracts.filter(
+    (contract) =>
+      matches(contract.title) ||
+      matches(contract.client) ||
+      matches(contract.freelancer_name) ||
+      matches(contractRef(contract))
   );
 
   return (
@@ -38,10 +38,10 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
           <StatCard label="Open listings" value={jobs.length} icon="search" tone="info" sub="Visible in the marketplace" />
         </Col>
         <Col sm={3}>
-          <StatCard label="Live contracts" value={active.length} icon="briefcase" tone="warn" sub={`${orders.length} all time`} />
+          <StatCard label="Live contracts" value={live.length} icon="briefcase" tone="warn" sub={`${contracts.length} all time`} />
         </Col>
         <Col sm={3}>
-          <StatCard label="Contract volume" value={money(gmv)} icon="dollar" tone="success" sub="Total value ever funded" />
+          <StatCard label="Contract volume" value={money(volume)} icon="dollar" tone="success" sub="Total value ever funded" />
         </Col>
         <Col sm={3}>
           <StatCard
@@ -63,7 +63,7 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
                 onClick={() => setView(item.key)}
               >
                 {item.label}
-                <span className="wm-chip__count">{item.key === 'jobs' ? jobs.length : orders.length}</span>
+                <span className="wm-chip__count">{item.key === 'jobs' ? jobs.length : contracts.length}</span>
               </button>
             ))}
           </div>
@@ -96,42 +96,39 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
                 </tr>
               </thead>
               <tbody>
-                {visibleJobs.map((job) => {
-                  const bids = proposals.filter((p) => p.job_id === job.id).length;
-                  return (
-                    <tr key={job.id}>
-                      <td>
-                        <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{job.title}</div>
-                        <div className="wm-chips mt-1">
-                          {job.skills.slice(0, 3).map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '0.87rem' }}>{job.client}</div>
-                        <div className="text-muted" style={{ fontSize: '0.77rem' }}>
-                          <Icon name="star" size={11} /> {job.client_rating}
-                        </div>
-                      </td>
-                      <td>
-                        <span className="wm-num">{money(job.budget)}</span>
-                        <div className="text-muted" style={{ fontSize: '0.77rem' }}>{job.days} days</div>
-                      </td>
-                      <td><Pill tone={bids > 0 ? 'info' : 'muted'}>{bids}</Pill></td>
-                      <td className="text-muted" style={{ fontSize: '0.83rem' }}>
-                        {timeAgo(job.created_at)}
-                      </td>
-                      <td className="text-end">
-                        <Button size="sm" variant="outline-secondary" onClick={() => setRemoving(job)}>
-                          Remove
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {visibleJobs.map((job) => (
+                  <tr key={job.id}>
+                    <td>
+                      <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{job.title}</div>
+                      <div className="wm-chips mt-1">
+                        {job.skills.slice(0, 3).map((skill) => <span className="wm-tag" key={skill}>{skill}</span>)}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '0.87rem' }}>{job.client}</div>
+                      <div className="text-muted" style={{ fontSize: '0.77rem' }}>
+                        <Icon name="star" size={11} /> {job.client_rating}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="wm-num">{money(job.budget)}</span>
+                      <div className="text-muted" style={{ fontSize: '0.77rem' }}>{job.days} days</div>
+                    </td>
+                    <td>
+                      <Pill tone={num(job.proposal_count) > 0 ? 'info' : 'muted'}>{job.proposal_count}</Pill>
+                    </td>
+                    <td className="text-muted" style={{ fontSize: '0.83rem' }}>{timeAgo(job.created_at)}</td>
+                    <td className="text-end">
+                      <Button size="sm" variant="outline-secondary" onClick={() => setRemoving(job)}>
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </Table>
           )
-        ) : visibleOrders.length === 0 ? (
+        ) : visibleContracts.length === 0 ? (
           <EmptyState icon="briefcase" title="No contracts" body="Nothing matches that search." />
         ) : (
           <Table hover responsive className="align-middle">
@@ -139,43 +136,37 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
               <tr>
                 <th>Contract</th>
                 <th>Parties</th>
-                <th>Escrow</th>
-                <th>Released</th>
+                <th>Value</th>
                 <th>Deadline</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {visibleOrders.map((order) => {
-                const status = orderStatus(order);
-                const done = status.key === 'completed';
-                return (
-                  <tr key={order.id}>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{order.project}</div>
-                      <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                        {orderRef(order)} &middot; {milestonesOf(order).length} milestones
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.85rem' }}>{order.client}</div>
-                      <div className="text-muted" style={{ fontSize: '0.78rem' }}>{order.freelancer_name}</div>
-                    </td>
-                    <td className="wm-num" style={{ color: orderEscrow(order) > 0 ? 'var(--amber)' : 'inherit' }}>
-                      {money(orderEscrow(order))}
-                    </td>
-                    <td className="wm-num">{money(orderReleased(order))}</td>
-                    <td>
-                      {done ? (
-                        <span className="text-muted" style={{ fontSize: '0.83rem' }}>{shortDate(order.deadline)}</span>
-                      ) : (
-                        <Pill tone={deadlineTone(order.deadline)}>{deadlineLabel(order.deadline)}</Pill>
-                      )}
-                    </td>
-                    <td><Pill tone={status.tone}>{status.label}</Pill></td>
-                  </tr>
-                );
-              })}
+              {visibleContracts.map((contract) => (
+                <tr key={contract.id}>
+                  <td>
+                    <div style={{ fontWeight: 600, color: 'var(--slate-dark)' }}>{contract.title}</div>
+                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>{contractRef(contract)}</div>
+                  </td>
+                  <td>
+                    <div style={{ fontSize: '0.85rem' }}>{contract.client}</div>
+                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>{contract.freelancer_name}</div>
+                  </td>
+                  <td className="wm-num">{money(contract.amount)}</td>
+                  <td>
+                    {isLive(contract) ? (
+                      <Pill tone={deadlineTone(contract.deadline)}>{deadlineLabel(contract.deadline)}</Pill>
+                    ) : (
+                      <span className="text-muted" style={{ fontSize: '0.83rem' }}>{shortDate(contract.deadline)}</span>
+                    )}
+                  </td>
+                  <td>
+                    <Pill tone={contractStatus(contract, 'client').tone}>
+                      {contractStatus(contract, 'client').label}
+                    </Pill>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </Table>
         )}
@@ -184,14 +175,14 @@ const JobManagement = ({ jobs, orders, proposals, onCloseJob }) => {
       <Modal show={Boolean(removing)} onHide={() => setRemoving(null)} centered size="sm">
         {removing && (
           <Modal.Body className="text-center p-4">
-            <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>Remove "{removing.title}"?</h6>
+            <h6 style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>Delete "{removing.title}"?</h6>
             <p className="text-muted" style={{ fontSize: '0.86rem' }}>
-              It disappears from the marketplace and any open proposals on it are declined.
+              The listing and every proposal on it are removed from the database.
             </p>
             <div className="d-flex gap-2 justify-content-center">
               <Button size="sm" variant="outline-secondary" onClick={() => setRemoving(null)}>Keep it</Button>
-              <Button size="sm" variant="primary" onClick={() => { onCloseJob(removing.id); setRemoving(null); }}>
-                Remove listing
+              <Button size="sm" variant="danger" onClick={() => { onDeleteJob(removing.id); setRemoving(null); }}>
+                Delete listing
               </Button>
             </div>
           </Modal.Body>

@@ -1,28 +1,20 @@
 import { Row, Col, Button } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
-import { StatCard, Pill, EmptyState, Avatar, EscrowBar } from '../../../components/Shared';
+import { StatCard, Pill, EmptyState, Avatar } from '../../../components/Shared';
 import {
-  money, timeAgo, deadlineLabel, deadlineTone, orderRef,
-  orderStatus, orderEscrow, orderReleased, orderTotal, clientNextAction, clientNeedsAttention,
-  activityOf,
+  money, deadlineLabel, deadlineTone, isLive, escrowOf, releasedOf, sumBy, clientAction,
 } from '../../../data/helpers';
 
-const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo }) => {
-  const active = orders.filter((order) => orderStatus(order).key !== 'completed');
-  const inEscrow = active.reduce((sum, order) => sum + orderEscrow(order), 0);
-  const totalSpent = orders.reduce((sum, order) => sum + orderReleased(order), 0);
-  const committed = active.reduce((sum, order) => sum + orderTotal(order), 0);
+const ClientOverview = ({ contracts, jobs, proposals, user, onOpenProject, onGo }) => {
+  const live = contracts.filter(isLive);
+
+  const inEscrow = sumBy(live, escrowOf);
+  const released = sumBy(contracts, releasedOf);
   const pendingProposals = proposals.filter((p) => p.status === 'Pending');
 
-  const decisions = active
-    .filter(clientNeedsAttention)
-    .map((order) => ({ order, action: clientNextAction(order) }))
-    .sort((a, b) => new Date(a.order.deadline) - new Date(b.order.deadline));
-
-  const latestActivity = orders
-    .flatMap((order) => activityOf(order).map((item) => ({ ...item, order })))
-    .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 6);
+  const decisions = live
+    .filter(clientAction)
+    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
 
   return (
     <>
@@ -30,7 +22,7 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
         <Col sm={6} xl={3}>
           <StatCard
             label="Active projects" icon="briefcase" tone="info"
-            value={active.length}
+            value={live.length}
             sub={decisions.length > 0 ? `${decisions.length} need a decision` : 'Nothing waiting on you'}
           />
         </Col>
@@ -38,13 +30,13 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
           <StatCard
             label="Held in escrow" icon="lock" tone="warn"
             value={money(inEscrow)}
-            sub={`of ${money(committed)} committed`}
+            sub="Yours until you approve"
           />
         </Col>
         <Col sm={6} xl={3}>
           <StatCard
             label="Released to date" icon="check" tone="success"
-            value={money(totalSpent)}
+            value={money(released)}
             sub="Paid only for approved work"
           />
         </Col>
@@ -59,14 +51,14 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
 
       <Row className="g-3">
         <Col lg={7}>
-          <div className="wm-panel wm-panel--flush mb-3">
+          <div className="wm-panel wm-panel--flush">
             <div className="wm-panel__head d-flex justify-content-between align-items-center">
               <div>
                 <h5 className="m-0" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>
                   Waiting on your decision
                 </h5>
                 <p className="m-0 text-muted" style={{ fontSize: '0.82rem' }}>
-                  Deliveries to review and scope changes to settle
+                  Work that has been delivered and needs approving
                 </p>
               </div>
               <Button size="sm" variant="outline-secondary" onClick={() => onGo('My Projects')}>
@@ -78,57 +70,33 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
               <EmptyState
                 icon="check"
                 title="Nothing needs you right now"
-                body="Every project is with its freelancer. You will get a notification the moment something is delivered."
+                body="Every project is with its freelancer."
                 action={<Button size="sm" variant="primary" onClick={() => onGo('Post a Job')}>Post another job</Button>}
               />
             ) : (
-              decisions.map(({ order, action }) => (
+              decisions.map((contract) => (
                 <button
-                  key={order.id}
+                  key={contract.id}
                   type="button"
                   className="wm-thread w-100"
-                  onClick={() => onOpenProject(order.id)}
+                  onClick={() => onOpenProject(contract.id)}
                 >
-                  <Avatar name={order.freelancer_name} size={36} />
+                  <Avatar name={contract.freelancer_name} size={36} />
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
                     <div className="d-flex align-items-center gap-2 flex-wrap">
-                      <span className="wm-thread__name">{order.project}</span>
-                      <Pill tone={action.tone}>{action.label}</Pill>
+                      <span className="wm-thread__name">{contract.title}</span>
+                      <Pill tone="warn">{clientAction(contract)}</Pill>
                     </div>
                     <div className="wm-thread__preview" style={{ maxWidth: '100%' }}>
-                      {order.freelancer_name} &middot; {money(orderEscrow(order))} still in escrow
-                    </div>
-                    <div className="mt-2" style={{ maxWidth: 220 }}>
-                      <EscrowBar released={orderReleased(order)} total={orderTotal(order)} />
+                      {contract.freelancer_name} &middot; {money(contract.amount)} in escrow
                     </div>
                   </div>
                   <div className="text-end">
-                    <Pill tone={deadlineTone(order.deadline)}>{deadlineLabel(order.deadline)}</Pill>
+                    <Pill tone={deadlineTone(contract.deadline)}>{deadlineLabel(contract.deadline)}</Pill>
                     <div className="mt-2 text-muted"><Icon name="chevron" size={14} /></div>
                   </div>
                 </button>
               ))
-            )}
-          </div>
-
-          <div className="wm-panel">
-            <h5 className="m-0 mb-3" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>
-              Recent activity
-            </h5>
-            {latestActivity.length === 0 ? (
-              <p className="text-muted small m-0">Nothing has happened yet.</p>
-            ) : (
-              <ul className="wm-timeline">
-                {latestActivity.map((item) => (
-                  <li
-                    key={`${item.order.id}-${item.id}`}
-                    className={item.actor === 'freelancer' ? 'is-client' : item.actor === 'system' ? 'is-system' : ''}
-                  >
-                    {item.text}
-                    <time>{orderRef(item.order)} &middot; {timeAgo(item.at)}</time>
-                  </li>
-                ))}
-              </ul>
             )}
           </div>
         </Col>
@@ -171,12 +139,10 @@ const ClientOverview = ({ orders, jobs, proposals, profile, onOpenProject, onGo 
 
           <div className="wm-panel">
             <div className="d-flex align-items-center gap-3 mb-3">
-              <Avatar name={profile ? profile.company : 'W'} size={46} tone="slate" />
+              <Avatar name={user.company || user.name} size={46} tone="slate" />
               <div>
-                <div style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>{profile ? profile.company : ''}</div>
-                <div className="text-muted" style={{ fontSize: '0.82rem' }}>
-                  {profile ? `${profile.contact} - ${profile.role}` : ''}
-                </div>
+                <div style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>{user.company || user.name}</div>
+                <div className="text-muted" style={{ fontSize: '0.82rem' }}>{user.name} &middot; {user.title}</div>
               </div>
             </div>
             <div className="d-grid gap-2">

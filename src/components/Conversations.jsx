@@ -1,33 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Row, Col, Form, Button } from 'react-bootstrap';
 import Icon from './Icon';
-import { Pill, Avatar, EmptyState } from './Shared';
-import { timeAgo, unreadCount, orderStatus, orderRef, messagesOf } from '../data/helpers';
+import { Avatar, EmptyState, Pill } from './Shared';
+import { timeAgo, contractStatus } from '../data/helpers';
 
-const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
-  const other = (order) => (role === 'client' ? order.freelancer_name : order.client);
-
-  const lastMessageTime = (order) => {
-    const messages = messagesOf(order);
-    if (messages.length === 0) return 0;
-    return new Date(messages[messages.length - 1].sent_at);
-  };
-
-  const sorted = [...orders].sort((a, b) => lastMessageTime(b) - lastMessageTime(a));
-
-  const [activeId, setActiveId] = useState(sorted.length > 0 ? sorted[0].id : null);
+const Conversations = ({ contracts, role, onSend }) => {
+  const [activeId, setActiveId] = useState(contracts.length > 0 ? contracts[0].id : null);
   const [text, setText] = useState('');
 
-  const active = orders.find((order) => order.id === activeId) || null;
+  const active = contracts.find((contract) => contract.id === activeId) || null;
 
-  useEffect(() => {
-    if (activeId) onRead(activeId, role);
-  }, [activeId]);
-
-  useEffect(() => {
-    const node = document.getElementById('conversations-chat-end');
-    if (node) node.scrollIntoView({ block: 'nearest' });
-  }, [activeId, active ? messagesOf(active).length : 0]);
+  const other = (contract) => (role === 'client' ? contract.freelancer_name : contract.client);
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -36,15 +19,17 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
     setText('');
   };
 
-  if (orders.length === 0) {
+  if (contracts.length === 0) {
     return (
       <div className="wm-panel">
         <EmptyState
           icon="chat"
           title="No conversations yet"
-          body={role === 'client'
-            ? 'A thread opens automatically when you hire someone.'
-            : 'Threads open automatically when a client hires you.'}
+          body={
+            role === 'client'
+              ? 'A thread opens automatically when you hire someone.'
+              : 'A thread opens automatically when a client hires you.'
+          }
         />
       </div>
     );
@@ -55,30 +40,28 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
       <Row className="g-0">
         <Col lg={4}>
           <div className="wm-thread-list">
-            {sorted.map((order) => {
-              const messages = messagesOf(order);
+            {contracts.map((contract) => {
+              const messages = contract.messages || [];
               const last = messages[messages.length - 1];
-              const unread = unreadCount(order, role);
 
               return (
                 <button
-                  key={order.id}
+                  key={contract.id}
                   type="button"
-                  className={`wm-thread ${activeId === order.id ? 'active' : ''}`}
-                  onClick={() => setActiveId(order.id)}
+                  className={`wm-thread ${activeId === contract.id ? 'active' : ''}`}
+                  onClick={() => setActiveId(contract.id)}
                 >
-                  <Avatar name={other(order)} size={38} tone="slate" />
+                  <Avatar name={other(contract)} size={38} tone="slate" />
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
                     <div className="d-flex justify-content-between align-items-center">
-                      <span className="wm-thread__name">{other(order)}</span>
+                      <span className="wm-thread__name">{other(contract)}</span>
                       <span className="text-muted" style={{ fontSize: '0.72rem' }}>
                         {last ? timeAgo(last.sent_at) : ''}
                       </span>
                     </div>
                     <div className="wm-thread__preview">{last ? last.body : 'No messages yet'}</div>
-                    <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>{order.project}</div>
+                    <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>{contract.title}</div>
                   </div>
-                  {unread > 0 && <span className="wm-thread__dot" />}
                 </button>
               );
             })}
@@ -91,24 +74,17 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
               <div className="wm-panel__head d-flex justify-content-between align-items-center">
                 <div>
                   <div style={{ fontWeight: 700, color: 'var(--slate-dark)' }}>{other(active)}</div>
-                  <div className="text-muted" style={{ fontSize: '0.8rem' }}>
-                    {active.project} &middot; {orderRef(active)}
-                  </div>
+                  <div className="text-muted" style={{ fontSize: '0.8rem' }}>{active.title}</div>
                 </div>
-                <div className="d-flex align-items-center gap-2">
-                  <Pill tone={orderStatus(active, role).tone}>{orderStatus(active, role).label}</Pill>
-                  <Button size="sm" variant="outline-secondary" onClick={() => onOpenOrder(active.id)}>
-                    Open workspace
-                  </Button>
-                </div>
+                <Pill tone={contractStatus(active, role).tone}>{contractStatus(active, role).label}</Pill>
               </div>
 
               <div className="wm-panel__body">
-                {messagesOf(active).length === 0 ? (
+                {(active.messages || []).length === 0 ? (
                   <EmptyState icon="chat" title="Start the conversation" body={`Say hello to ${other(active)}.`} />
                 ) : (
                   <div className="wm-chat">
-                    {messagesOf(active).map((message) => (
+                    {active.messages.map((message) => (
                       <div
                         key={message.id}
                         className={`wm-bubble wm-bubble--${message.sender_role === role ? 'you' : 'client'}`}
@@ -119,7 +95,6 @@ const Conversations = ({ orders, role, onSend, onRead, onOpenOrder }) => {
                         </div>
                       </div>
                     ))}
-                    <div id="conversations-chat-end" />
                   </div>
                 )}
 

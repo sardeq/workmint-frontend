@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Dropdown } from 'react-bootstrap';
 import Icon from './Icon';
 import { Avatar } from './Shared';
-import { timeAgo } from '../data/helpers';
+
 
 const NAV = {
   client: [
@@ -17,7 +16,7 @@ const NAV = {
   ],
   freelancer: [
     { key: 'Overview', icon: 'grid' },
-    { key: 'My Orders', icon: 'briefcase' },
+    { key: 'My Contracts', icon: 'briefcase' },
     { key: 'Available Jobs', icon: 'search' },
     { key: 'My Proposals', icon: 'send' },
     { key: 'Messages', icon: 'chat' },
@@ -27,25 +26,13 @@ const NAV = {
   ],
   admin: [
     { key: 'Overview', icon: 'grid' },
-    { key: 'Disputes', icon: 'alert' },
     { key: 'Approvals', icon: 'check' },
     { key: 'Users', icon: 'user' },
     { key: 'Jobs', icon: 'briefcase' },
-    { key: 'Analytics', icon: 'trend' },
   ],
 };
 
-const Layout = ({
-  user,
-  onLogout,
-  title,
-  subtitle,
-  activeTab,
-  setActiveTab,
-  badges = {},
-  notifications = [],
-  children,
-}) => {
+const Layout = ({ user, onLogout, title, subtitle, activeTab, setActiveTab, badges = {}, children }) => {
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -54,7 +41,7 @@ const Layout = ({
     navigate('/login');
   };
 
-  const navItems = NAV[user.role] || NAV.freelancer;
+  const navItems = NAV[user.role];
 
   const go = (key) => {
     setActiveTab(key);
@@ -117,32 +104,6 @@ const Layout = ({
           </div>
 
           <div className="wm-topbar__actions">
-            <Dropdown align="end">
-              <Dropdown.Toggle as="button" className="wm-icon-btn" aria-label="Notifications">
-                <Icon name="bell" size={17} />
-                {notifications.length > 0 && <span className="wm-icon-btn__dot" />}
-              </Dropdown.Toggle>
-              <Dropdown.Menu style={{ width: 320, padding: 0, borderRadius: 14, border: '1px solid var(--border-color)' }}>
-                <div className="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
-                  <strong style={{ fontSize: '0.85rem' }}>Notifications</strong>
-                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>{notifications.length} new</span>
-                </div>
-                <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                  {notifications.length === 0 && (
-                    <div className="px-3 py-4 text-center text-muted" style={{ fontSize: '0.85rem' }}>
-                      Nothing yet. Activity on your contracts shows up here.
-                    </div>
-                  )}
-                  {notifications.slice(0, 8).map((item) => (
-                    <div key={item.id} className="px-3 py-2 border-bottom" style={{ fontSize: '0.83rem' }}>
-                      <div style={{ color: 'var(--slate-dark)' }}>{item.text}</div>
-                      <div className="text-muted" style={{ fontSize: '0.72rem' }}>{timeAgo(item.at)}</div>
-                    </div>
-                  ))}
-                </div>
-              </Dropdown.Menu>
-            </Dropdown>
-
             <div className="d-none d-sm-flex align-items-center gap-2">
               <div className="text-end lh-sm">
                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{user.name}</div>

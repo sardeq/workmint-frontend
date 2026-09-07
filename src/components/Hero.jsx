@@ -1,32 +1,31 @@
 import Icon from './Icon';
 import { money } from '../data/helpers';
 
+
 const RECEIPT = {
-  id: 'ORD-892',
+  id: 'CON-892',
   project: 'C++ systems architecture',
   client: 'TechCorp',
-  milestones: [
-    { id: 1, title: 'Architecture & schema', note: 'Approved 12 Sep', amount: 800, state: 'approved' },
-    { id: 2, title: 'Core service refactor', note: 'Approved 28 Sep', amount: 1200, state: 'approved' },
-    { id: 3, title: 'Load testing & handover', note: 'In progress', amount: 1400, state: 'active' },
+  amount: 3400,
+  steps: [
+    { id: 1, title: 'Client funds the escrow', note: 'Paid 12 Sep', state: 'approved' },
+    { id: 2, title: 'Freelancer delivers the work', note: 'Delivered 28 Sep', state: 'approved' },
+    { id: 3, title: 'Client approves and money is released', note: 'Waiting on review', state: 'active' },
   ],
 };
 
 const STATE_ICON = { approved: 'check', active: 'clock', pending: 'lock' };
 
 const Hero = ({ searchQuery, setSearchQuery, handleSearch }) => {
-  const total = RECEIPT.milestones.reduce((sum, m) => sum + m.amount, 0);
-  const released = RECEIPT.milestones
-    .filter((m) => m.state === 'approved')
-    .reduce((sum, m) => sum + m.amount, 0);
-  const held = total - released;
+  const done = RECEIPT.steps.filter((step) => step.state === 'approved').length;
+  const progress = Math.round((done / RECEIPT.steps.length) * 100);
 
   return (
     <header className="hero" id="top">
       <div className="wm-container hero__grid">
         <div>
           <span className="wm-eyebrow-line reveal reveal--1">
-            <Icon name="lock" size={12} /> Milestone escrow
+            <Icon name="lock" size={12} /> Escrow protected
           </span>
 
           <h1 className="wm-display reveal reveal--1">
@@ -34,9 +33,9 @@ const Hero = ({ searchQuery, setSearchQuery, handleSearch }) => {
           </h1>
 
           <p className="wm-lead hero__subtitle reveal reveal--2">
-            Hire technical talent and pay in milestones. The money is funded up front, held
-            by Workmint, and released the moment you approve the work. No chasing invoices,
-            no scope creep, no awkward conversations.
+            Hire technical talent without paying up front and hoping. The money is funded
+            into escrow, held by Workmint, and released the moment you approve the work.
+            No chasing invoices, no awkward conversations.
           </p>
 
           <form onSubmit={handleSearch} className="search-form reveal reveal--2">
@@ -78,16 +77,15 @@ const Hero = ({ searchQuery, setSearchQuery, handleSearch }) => {
           </div>
 
           <div className="receipt__body">
-            {RECEIPT.milestones.map((m) => (
-              <div className="receipt__row" key={m.id}>
-                <span className={`receipt__dot receipt__dot--${m.state}`}>
-                  <Icon name={STATE_ICON[m.state]} size={11} strokeWidth={2.5} />
+            {RECEIPT.steps.map((step) => (
+              <div className="receipt__row" key={step.id}>
+                <span className={`receipt__dot receipt__dot--${step.state}`}>
+                  <Icon name={STATE_ICON[step.state]} size={11} strokeWidth={2.5} />
                 </span>
                 <span className="receipt__label">
-                  {m.title}
-                  <small>{m.note}</small>
+                  {step.title}
+                  <small>{step.note}</small>
                 </span>
-                <span className="wm-figure receipt__amount">{money(m.amount)}</span>
               </div>
             ))}
           </div>
@@ -95,16 +93,16 @@ const Hero = ({ searchQuery, setSearchQuery, handleSearch }) => {
           <div className="receipt__foot">
             <div className="receipt__split">
               <span>
-                Released to freelancer
-                <strong className="wm-figure">{money(released)}</strong>
+                Contract value
+                <strong className="wm-figure">{money(RECEIPT.amount)}</strong>
               </span>
               <span style={{ textAlign: 'right' }}>
                 Still in escrow
-                <strong className="wm-figure" style={{ color: 'var(--amber)' }}>{money(held)}</strong>
+                <strong className="wm-figure" style={{ color: 'var(--amber)' }}>{money(RECEIPT.amount)}</strong>
               </span>
             </div>
             <div className="receipt__bar">
-              <span style={{ width: `${Math.round((released / total) * 100)}%` }} />
+              <span style={{ width: `${progress}%` }} />
             </div>
           </div>
         </aside>

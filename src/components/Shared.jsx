@@ -47,14 +47,15 @@ export const EmptyState = ({ icon = 'inbox', title, body, action }) => (
   </div>
 );
 
-export const EscrowBar = ({ released, total }) => {
-  const percent = total === 0 ? 0 : Math.round((released / total) * 100);
-  return (
-    <div className="wm-escrow-bar" role="img" aria-label={`${percent}% released`}>
-      <div className="wm-escrow-bar__fill" style={{ width: `${percent}%` }} />
+export const PanelHead = ({ title, sub, right }) => (
+  <div className="wm-panel__head d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <h5 className="m-0" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>{title}</h5>
+      {sub && <p className="m-0 text-muted" style={{ fontSize: '0.82rem' }}>{sub}</p>}
     </div>
-  );
-};
+    {right}
+  </div>
+);
 
 export const ToastMessage = ({ toast, onClose }) => (
   <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 1080 }}>

@@ -1,99 +1,56 @@
 import { Row, Col, Button } from 'react-bootstrap';
-import Icon from '../../../components/Icon';
 import { Pill, EmptyState, Avatar } from '../../../components/Shared';
 import AdminStats from './AdminStats';
 import {
-  money, timeAgo, orderRef, orderStatus, orderEscrow, orderTotal, activityOf, DISPUTE_STATUS,
+  money, timeAgo, shortDate, isLive, escrowOf, contractStatus,
 } from '../../../data/helpers';
 
-const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispute, onGo }) => {
-  const openDisputes = disputes.filter((dispute) => dispute.status !== 'Resolved');
+const AdminOverview = ({ contracts, jobs, users, proposals, onGo }) => {
   const pendingUsers = users.filter((person) => person.status === 'pending');
-  const activeOrders = orders.filter((order) => orderStatus(order).key !== 'completed');
+  const live = contracts.filter(isLive);
 
-  const latestActivity = orders
-    .flatMap((order) => activityOf(order).map((item) => ({ ...item, order })))
-    .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 8);
-
-  const biggest = [...activeOrders]
-    .sort((a, b) => orderEscrow(b) - orderEscrow(a))
-    .slice(0, 4);
+  const biggest = [...live].sort((a, b) => escrowOf(b) - escrowOf(a)).slice(0, 4);
 
   return (
     <>
-      <AdminStats orders={orders} users={users} disputes={disputes} />
+      <AdminStats contracts={contracts} users={users} />
 
       <Row className="g-3">
         <Col lg={7}>
-          <div className="wm-panel wm-panel--flush mb-3">
+          <div className="wm-panel wm-panel--flush">
             <div className="wm-panel__head d-flex justify-content-between align-items-center">
               <div>
                 <h5 className="m-0" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>
-                  Cases waiting on a mediator
+                  Live contracts
                 </h5>
                 <p className="m-0 text-muted" style={{ fontSize: '0.82rem' }}>
-                  Escrow stays frozen until each is resolved
+                  Everything currently running on the platform
                 </p>
               </div>
-              <Button size="sm" variant="outline-secondary" onClick={() => onGo('Disputes')}>All cases</Button>
+              <Button size="sm" variant="outline-secondary" onClick={() => onGo('Jobs')}>All contracts</Button>
             </div>
 
-            {openDisputes.length === 0 ? (
-              <EmptyState
-                icon="check"
-                title="No open disputes"
-                body="Nothing is frozen. Every contract is moving on its own."
-              />
+            {live.length === 0 ? (
+              <EmptyState icon="briefcase" title="Nothing running" body="No live contracts on the platform." />
             ) : (
-              openDisputes.map((dispute) => (
-                <button
-                  key={dispute.id}
-                  type="button"
-                  className="wm-thread w-100"
-                  onClick={() => onReviewDispute(dispute)}
-                >
-                  <span className="wm-stat__icon wm-stat__icon--danger" style={{ width: 36, height: 36 }}>
-                    <Icon name="alert" size={16} />
-                  </span>
-                  <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                    <div className="d-flex align-items-center gap-2 flex-wrap">
-                      <span className="wm-thread__name">Case {dispute.id}</span>
-                      <Pill tone={DISPUTE_STATUS[dispute.status].tone}>{dispute.status}</Pill>
-                      <Pill tone="muted">raised by the {dispute.raised_by}</Pill>
+              live.map((contract) => (
+                <div key={contract.id} className="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--slate-dark)' }}>
+                      {contract.title}
                     </div>
-                    <div className="wm-thread__preview" style={{ maxWidth: '100%' }}>{dispute.reason}</div>
-                    <div className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
-                      {dispute.client} vs {dispute.freelancer} &middot; {dispute.project}
+                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                      {contract.client} &rarr; {contract.freelancer_name} &middot; due {shortDate(contract.deadline)}
                     </div>
                   </div>
                   <div className="text-end">
-                    <div className="wm-num">{money(dispute.amount)}</div>
-                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{timeAgo(dispute.opened_at)}</div>
+                    <div className="wm-num" style={{ color: 'var(--amber)' }}>{money(contract.amount)}</div>
+                    <Pill tone={contractStatus(contract, 'client').tone}>
+                      {contractStatus(contract, 'client').label}
+                    </Pill>
                   </div>
-                </button>
+                </div>
               ))
-            )}
-          </div>
-
-          <div className="wm-panel">
-            <h5 className="m-0 mb-3" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>
-              Platform activity
-            </h5>
-            {latestActivity.length === 0 ? (
-              <p className="text-muted small m-0">Nothing has happened yet.</p>
-            ) : (
-              <ul className="wm-timeline">
-                {latestActivity.map((item) => (
-                  <li
-                    key={`${item.order.id}-${item.id}`}
-                    className={item.actor === 'system' ? 'is-system' : item.actor === 'client' ? 'is-client' : ''}
-                  >
-                    {item.text}
-                    <time>{orderRef(item.order)} &middot; {timeAgo(item.at)}</time>
-                  </li>
-                ))}
-              </ul>
             )}
           </div>
         </Col>
@@ -110,7 +67,7 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
             {pendingUsers.length === 0 ? (
               <EmptyState icon="check" title="Queue is clear" body="No accounts are waiting on screening." />
             ) : (
-              pendingUsers.slice(0, 4).map((person) => (
+              pendingUsers.map((person) => (
                 <div key={person.id} className="d-flex align-items-center gap-2 px-4 py-3 border-bottom">
                   <Avatar name={person.name} size={34} />
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
@@ -123,29 +80,15 @@ const AdminOverview = ({ orders, jobs, users, disputes, proposals, onReviewDispu
             )}
           </div>
 
-          <div className="wm-panel wm-panel--flush">
-            <div className="wm-panel__head d-flex justify-content-between align-items-center">
-              <h5 className="m-0" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--slate-dark)' }}>
-                Largest escrow balances
-              </h5>
-              <Button size="sm" variant="outline-secondary" onClick={() => onGo('Jobs')}>Contracts</Button>
-            </div>
-
+          <div className="wm-panel">
+            <div className="wm-eyebrow mb-2">Largest escrow balances</div>
             {biggest.length === 0 ? (
-              <EmptyState icon="lock" title="Nothing in escrow" body="No live contracts on the platform." />
+              <p className="text-muted small m-0">Nothing in escrow.</p>
             ) : (
-              biggest.map((order) => (
-                <div key={order.id} className="d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '0.89rem', fontWeight: 600, color: 'var(--slate-dark)' }}>{order.project}</div>
-                    <div className="text-muted" style={{ fontSize: '0.77rem' }}>
-                      {order.client} &rarr; {order.freelancer_name}
-                    </div>
-                  </div>
-                  <div className="text-end">
-                    <div className="wm-num" style={{ color: 'var(--amber)' }}>{money(orderEscrow(order))}</div>
-                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>of {money(orderTotal(order))}</div>
-                  </div>
+              biggest.map((contract) => (
+                <div key={contract.id} className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                  <span style={{ fontSize: '0.87rem', color: 'var(--slate-dark)' }}>{contract.title}</span>
+                  <span className="wm-num">{money(contract.amount)}</span>
                 </div>
               ))
             )}

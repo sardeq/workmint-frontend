@@ -1,15 +1,14 @@
 import { Row, Col } from 'react-bootstrap';
 import { StatCard } from '../../../components/Shared';
-import { money, num, FEE_RATE, orderEscrow, orderReleased } from '../../../data/helpers';
+import { money, isLive, escrowOf, releasedOf, sumBy, FEE_RATE } from '../../../data/helpers';
 
-const AdminStats = ({ orders, users, disputes }) => {
-  const escrow = orders.reduce((sum, order) => sum + orderEscrow(order), 0);
-  const released = orders.reduce((sum, order) => sum + orderReleased(order), 0);
+const AdminStats = ({ contracts, users }) => {
+  const escrow = sumBy(contracts.filter(isLive), escrowOf);
+  const released = sumBy(contracts, releasedOf);
   const fees = Math.round(released * FEE_RATE);
 
-  const openDisputes = disputes.filter((dispute) => dispute.status !== 'Resolved');
-  const frozen = openDisputes.reduce((sum, dispute) => sum + num(dispute.amount), 0);
   const pending = users.filter((person) => person.status === 'pending').length;
+  const suspended = users.filter((person) => person.status === 'suspended').length;
 
   return (
     <Row className="g-3 mb-4">
@@ -29,16 +28,16 @@ const AdminStats = ({ orders, users, disputes }) => {
       </Col>
       <Col sm={6} xl={3}>
         <StatCard
-          label="Open disputes" icon="alert" tone={openDisputes.length > 0 ? 'danger' : 'muted'}
-          value={openDisputes.length}
-          sub={frozen > 0 ? `${money(frozen)} frozen` : 'Nothing frozen'}
+          label="Pending approvals" icon="user" tone={pending > 0 ? 'info' : 'muted'}
+          value={pending}
+          sub={pending > 0 ? 'Waiting on screening' : 'Queue is clear'}
         />
       </Col>
       <Col sm={6} xl={3}>
         <StatCard
-          label="Pending approvals" icon="user" tone={pending > 0 ? 'info' : 'muted'}
-          value={pending}
-          sub={pending > 0 ? 'Waiting on screening' : 'Queue is clear'}
+          label="Suspended accounts" icon="alert" tone={suspended > 0 ? 'danger' : 'muted'}
+          value={suspended}
+          sub={suspended > 0 ? 'Blocked from signing in' : 'None blocked'}
         />
       </Col>
     </Row>

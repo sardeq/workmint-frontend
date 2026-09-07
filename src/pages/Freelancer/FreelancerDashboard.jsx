@@ -6,7 +6,7 @@ import Conversations from '../../components/Conversations';
 import { ToastMessage } from '../../components/Shared';
 
 import FreelancerOverview from './components/FreelancerOverview';
-import OrdersTable from './components/OrdersTable';
+import ContractsTable from './components/ContractsTable';
 import ProjectWorkspace from './components/ProjectWorkspace';
 import AvailableJobs from './components/AvailableJobs';
 import MyProposals from './components/MyProposals';
@@ -15,17 +15,17 @@ import Portfolio from './components/Portfolio';
 import ProfileEdit from './components/ProfileEdit';
 
 import {
-  ordersApi, jobsApi, proposalsApi, milestonesApi, messagesApi, disputesApi,
+  contractsApi, jobsApi, proposalsApi, messagesApi,
   usersApi, portfolioApi, withdrawalsApi, errorText,
 } from '../../api/api';
-import { unreadCount, needsAttention, orderRef, money } from '../../data/helpers';
+import { freelancerAction, money } from '../../data/helpers';
 
 const PAGE_COPY = {
-  'Overview': ['Your workspace', 'Everything waiting on you, in order of urgency'],
-  'My Orders': ['My orders', 'Active contracts and their escrow status'],
-  'Available Jobs': ['Find work', 'Open jobs matched to your skills'],
+  'Overview': ['Your workspace', 'Everything waiting on you'],
+  'My Contracts': ['My contracts', 'Work you have been hired for'],
+  'Available Jobs': ['Find work', 'Open jobs on the marketplace'],
   'My Proposals': ['My proposals', 'Bids you have sent and where they stand'],
-  'Messages': ['Messages', 'One thread per order, so nothing gets lost'],
+  'Messages': ['Messages', 'One thread per contract'],
   'Earnings': ['Earnings', 'Released, held in escrow, and paid out'],
   'Portfolio': ['Portfolio', 'What clients see before they hire you'],
   'Profile': ['Profile', 'Your public profile and availability'],
@@ -33,38 +33,34 @@ const PAGE_COPY = {
 
 const FreelancerDashboard = ({ user, onLogout, onUpdateUser }) => {
   const [activeTab, setActiveTab] = useState('Overview');
-  const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
-  const [orders, setOrders] = useState([]);
+  const [contracts, setContracts] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [portfolio, setPortfolio] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [profile, setProfile] = useState(null);
-  const [savedJobIds, setSavedJobIds] = useState([]);
 
   const notify = (text, tone = 'success') => setToast({ text, tone });
 
-  const loadOrders = async () => {
-    const rows = await ordersApi.getAll({ freelancer_id: user.id });
+  const loadContracts = async () => {
+    const rows = await contractsApi.getAll({ freelancer_id: user.id });
     const full = [];
     for (const row of rows) {
-      full.push(await ordersApi.getOne(row.id));
+      full.push(await contractsApi.getOne(row.id));
     }
-    setOrders(full);
+    setContracts(full);
   };
 
-  const loadProposals = async () => {
-    const rows = await proposalsApi.getAll({ freelancer_id: user.id });
-    setProposals(rows);
-  };
+  const loadProposals = async () => setProposals(await proposalsApi.getAll({ freelancer_id: user.id }));
 
   useEffect(() => {
     const loadWorkspace = async () => {
       try {
-        await loadOrders();
+        await loadContracts();
         await loadProposals();
         setJobs(await jobsApi.getAll());
         setProfile(await usersApi.getOne(user.id));
@@ -79,103 +75,43 @@ const FreelancerDashboard = ({ user, onLogout, onUpdateUser }) => {
     loadWorkspace();
   }, []);
 
-  const refreshOrder = async (orderId) => {
-    const fresh = await ordersApi.getOne(orderId);
-    setOrders(orders.map((order) => (order.id === orderId ? fresh : order)));
-    return fresh;
+  const refreshContract = async (id) => {
+    const fresh = await contractsApi.getOne(id);
+    setContracts(contracts.map((contract) => (contract.id === id ? fresh : contract)));
   };
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    setSelectedOrderId(null);
+    setSelectedId(null);
   };
 
-  const openOrder = (orderId) => {
-    setActiveTab('My Orders');
-    setSelectedOrderId(orderId);
+  const openContract = (id) => {
+    setActiveTab('My Contracts');
+    setSelectedId(id);
   };
 
-  const selectedOrder = orders.find((order) => order.id === selectedOrderId) || null;
+  const selected = contracts.find((contract) => contract.id === selectedId) || null;
 
   const badges = {
-    'My Orders': orders.filter(needsAttention).length,
-    'Messages': orders.reduce((sum, order) => sum + unreadCount(order, 'freelancer'), 0),
+    'My Contracts': contracts.filter(freelancerAction).length,
   };
 
-  const notifications = orders
-    .flatMap((order) =>
-      (order.activity || [])
-        .filter((item) => item.actor === 'client' || item.actor === 'system')
-        .map((item) => ({ id: `N-${order.id}-${item.id}`, at: item.at, text: item.text }))
-    )
-    .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 12);
-
-  const startMilestone = async (orderId, milestoneId) => {
+  const deliver = async (id, link, note) => {
     try {
-      const milestone = await milestonesApi.start(milestoneId);
-      await refreshOrder(orderId);
-      notify(`Started "${milestone.title}"`);
+      await contractsApi.deliver(id, link, note);
+      await refreshContract(id);
+      notify('Delivered. The client has been asked to review it.');
     } catch (err) {
-      notify(errorText(err, 'Could not start that milestone.'), 'warn');
+      notify(errorText(err, 'Could not send that delivery.'), 'warn');
     }
   };
 
-  const submitDeliverable = async (orderId, milestoneId, form) => {
+  const sendMessage = async (contractId, senderRole, text) => {
     try {
-      const milestone = await milestonesApi.deliver(milestoneId, form.link, form.note);
-      const order = await refreshOrder(orderId);
-      notify(`Delivered "${milestone.title}". ${order.client} has been notified.`);
-    } catch (err) {
-      notify(errorText(err, 'Could not deliver that milestone.'), 'warn');
-    }
-  };
-
-  const requestScopeChange = async (orderId, form) => {
-    try {
-      await ordersApi.requestScopeChange(orderId, {
-        reason: form.reason,
-        extra_cost: Number(form.extraCost) || 0,
-        extra_days: Number(form.extraDays) || 0,
-      });
-      await refreshOrder(orderId);
-      notify('Scope change sent for client approval');
-    } catch (err) {
-      notify(errorText(err, 'Could not send that request.'), 'warn');
-    }
-  };
-
-  const sendMessage = async (orderId, senderRole, text) => {
-    try {
-      await messagesApi.send(orderId, senderRole, text);
-      await refreshOrder(orderId);
+      await messagesApi.send(contractId, senderRole, text);
+      await refreshContract(contractId);
     } catch (err) {
       notify(errorText(err, 'Message not sent.'), 'warn');
-    }
-  };
-
-  const markThreadRead = async (orderId, role) => {
-    try {
-      await messagesApi.markRead(orderId, role);
-      await refreshOrder(orderId);
-    } catch (err) {
-      notify(errorText(err), 'warn');
-    }
-  };
-
-  const raiseDispute = async (orderId, milestoneId, raisedBy, form) => {
-    try {
-      await disputesApi.create({
-        order_id: orderId,
-        milestone_id: milestoneId,
-        raised_by: raisedBy,
-        reason: form.reason,
-        detail: form.detail,
-      });
-      await refreshOrder(orderId);
-      notify('Dispute opened. A mediator will review it.', 'warn');
-    } catch (err) {
-      notify(errorText(err, 'Could not open that dispute.'), 'warn');
     }
   };
 
@@ -205,22 +141,9 @@ const FreelancerDashboard = ({ user, onLogout, onUpdateUser }) => {
     }
   };
 
-  const toggleSaveJob = (jobId) => {
-    if (savedJobIds.includes(jobId)) {
-      setSavedJobIds(savedJobIds.filter((id) => id !== jobId));
-    } else {
-      setSavedJobIds([...savedJobIds, jobId]);
-    }
-  };
-
   const savePortfolioItem = async (item) => {
     try {
-      const body = {
-        title: item.title,
-        tech: item.tech,
-        link: item.link,
-        description: item.description,
-      };
+      const body = { title: item.title, tech: item.tech, link: item.link, description: item.description };
 
       if (item.id) {
         const saved = await portfolioApi.update(item.id, body);
@@ -268,11 +191,7 @@ const FreelancerDashboard = ({ user, onLogout, onUpdateUser }) => {
 
   const requestWithdrawal = async (amount, method) => {
     try {
-      const row = await withdrawalsApi.create({
-        freelancer_id: user.id,
-        amount: Number(amount),
-        method,
-      });
+      const row = await withdrawalsApi.create({ freelancer_id: user.id, amount: Number(amount), method });
       setWithdrawals([row, ...withdrawals]);
       notify(`${money(row.amount)} on the way to your ${method.toLowerCase()}`);
     } catch (err) {
@@ -293,44 +212,32 @@ const FreelancerDashboard = ({ user, onLogout, onUpdateUser }) => {
     if (activeTab === 'Overview') {
       return (
         <FreelancerOverview
-          orders={orders}
+          contracts={contracts}
           proposals={proposals}
           withdrawals={withdrawals}
           profile={profile}
-          onOpenOrder={openOrder}
+          onOpenContract={openContract}
           onGo={handleTabChange}
         />
       );
     }
 
-    if (activeTab === 'My Orders') {
-      if (selectedOrder) {
+    if (activeTab === 'My Contracts') {
+      if (selected) {
         return (
           <ProjectWorkspace
-            order={selectedOrder}
-            onBack={() => setSelectedOrderId(null)}
-            onStart={startMilestone}
-            onSubmit={submitDeliverable}
-            onScopeChange={requestScopeChange}
+            contract={selected}
+            onBack={() => setSelectedId(null)}
+            onDeliver={deliver}
             onSend={sendMessage}
-            onRead={markThreadRead}
-            onRaiseDispute={raiseDispute}
           />
         );
       }
-      return <OrdersTable orders={orders} onOpen={openOrder} />;
+      return <ContractsTable contracts={contracts} onOpen={openContract} />;
     }
 
     if (activeTab === 'Available Jobs') {
-      return (
-        <AvailableJobs
-          jobs={jobs}
-          proposals={proposals}
-          savedJobIds={savedJobIds}
-          onToggleSave={toggleSaveJob}
-          onApply={applyToJob}
-        />
-      );
+      return <AvailableJobs jobs={jobs} proposals={proposals} onApply={applyToJob} />;
     }
 
     if (activeTab === 'My Proposals') {
@@ -338,19 +245,11 @@ const FreelancerDashboard = ({ user, onLogout, onUpdateUser }) => {
     }
 
     if (activeTab === 'Messages') {
-      return (
-        <Conversations
-          orders={orders}
-          role="freelancer"
-          onSend={sendMessage}
-          onRead={markThreadRead}
-          onOpenOrder={openOrder}
-        />
-      );
+      return <Conversations contracts={contracts} role="freelancer" onSend={sendMessage} />;
     }
 
     if (activeTab === 'Earnings') {
-      return <Earnings orders={orders} withdrawals={withdrawals} onWithdraw={requestWithdrawal} />;
+      return <Earnings contracts={contracts} withdrawals={withdrawals} onWithdraw={requestWithdrawal} />;
     }
 
     if (activeTab === 'Portfolio') {
@@ -364,15 +263,15 @@ const FreelancerDashboard = ({ user, onLogout, onUpdateUser }) => {
     return null;
   };
 
-  const [pageTitle, pageSub] = PAGE_COPY[activeTab] || PAGE_COPY.Overview;
+  const [pageTitle, pageSub] = PAGE_COPY[activeTab];
   const firstName = user.name.split(' ')[0];
 
   let title = pageTitle;
   let subtitle = pageSub;
 
-  if (selectedOrder) {
-    title = selectedOrder.project;
-    subtitle = `${orderRef(selectedOrder)} for ${selectedOrder.client}`;
+  if (selected) {
+    title = selected.title;
+    subtitle = `For ${selected.client}`;
   } else if (activeTab === 'Overview') {
     title = `Welcome back, ${firstName}`;
   }
@@ -386,7 +285,6 @@ const FreelancerDashboard = ({ user, onLogout, onUpdateUser }) => {
       activeTab={activeTab}
       setActiveTab={handleTabChange}
       badges={badges}
-      notifications={notifications}
     >
       {renderContent()}
       <ToastMessage toast={toast} onClose={() => setToast(null)} />

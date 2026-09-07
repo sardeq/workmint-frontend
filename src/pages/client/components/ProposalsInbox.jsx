@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Row, Col, Button, Modal, Table } from 'react-bootstrap';
 import Icon from '../../../components/Icon';
 import { Pill, StatCard, EmptyState, Avatar } from '../../../components/Shared';
-import { money, num, timeAgo, grossWithClientFee, CLIENT_FEE_RATE } from '../../../data/helpers';
-
-const STATUS_TONE = { Pending: 'warn', Accepted: 'success', Declined: 'danger', Withdrawn: 'muted', Interviewing: 'info' };
+import {
+  money, num, timeAgo, grossWithClientFee, CLIENT_FEE_RATE, PROPOSAL_TONE,
+} from '../../../data/helpers';
 
 const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }) => {
   const [reading, setReading] = useState(null);
@@ -114,7 +114,7 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
                         )}
                       </td>
                       <td className="text-muted" style={{ fontSize: '0.85rem' }}>{timeAgo(p.sent_at)}</td>
-                      <td><Pill tone={STATUS_TONE[p.status]}>{p.status}</Pill></td>
+                      <td><Pill tone={PROPOSAL_TONE[p.status]}>{p.status}</Pill></td>
                       <td className="text-end">
                         <Button size="sm" variant="link" className="p-0 me-3" onClick={() => setReading(p)}>Read</Button>
                         {p.status === 'Pending' && (
@@ -150,7 +150,7 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
                     <div className="text-muted" style={{ fontSize: '0.78rem' }}>{p.job_title}</div>
                   </td>
                   <td className="wm-num">{money(p.amount)}</td>
-                  <td><Pill tone={STATUS_TONE[p.status]}>{p.status}</Pill></td>
+                  <td><Pill tone={PROPOSAL_TONE[p.status]}>{p.status}</Pill></td>
                   <td className="text-end">
                     <Button size="sm" variant="link" className="p-0" onClick={() => setReading(p)}>Read</Button>
                   </td>
@@ -219,7 +219,7 @@ const ProposalsInbox = ({ jobs, proposals, onHire, onDecline, onCloseJob, onGo }
             <Modal.Body>
               <p style={{ fontSize: '0.9rem' }}>
                 This funds the contract into escrow and opens a project workspace. The money stays
-                yours until you approve each milestone.
+                yours until you approve the delivered work.
               </p>
               <div className="wm-panel" style={{ background: '#f8fafc' }}>
                 <div className="d-flex justify-content-between py-1" style={{ fontSize: '0.87rem' }}>
